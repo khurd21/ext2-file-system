@@ -1,10 +1,24 @@
 /************* cd_ls_pwd.c file **************/
+
+#include <sys/stat.h>
+#include <ext2fs/ext2fs.h>
+#include <fcntl.h>
+#include "type.h"
+#include "util.h"
+#include "cd_ls_pwd.h"
+
 int cd()
 {
-  printf("cd: under construction READ textbook!!!!\n");
-
   // READ Chapter 11.7.3 HOW TO chdir
-  
+  const int ino = getino(pathname);
+  MINODE* mip = iget(dev, ino);
+  if (!S_ISDIR(mip->INODE.i_mode))
+  {
+    printf("cd:%s is not a directory.\n", pathname);
+  }
+  iput(running->cwd);
+  running->cwd = mip;
+  return 0;
 }
 
 int ls_file(MINODE *mip, char *name)
@@ -19,6 +33,7 @@ int ls_file(MINODE *mip, char *name)
   printf("ls_file: to be done: READ textbook!!!!\n");
   // READ Chapter 11.7.3 HOW TO ls
   // utilize the INODE struct information to display all information from the file
+  return 0;
 }
 
 int ls_dir(MINODE *mip)
@@ -55,6 +70,7 @@ int ls_dir(MINODE *mip)
      dp = (DIR *)cp;
   }
   printf("\n");
+  return 0;
 }
 
 int ls(char *pathname) // will use the inodes without the use of stat to obtain all information
@@ -77,16 +93,37 @@ int ls(char *pathname) // will use the inodes without the use of stat to obtain 
     ls_file(mip, pathname);
 
   iput(mip);
+  return 0;
 }
 
-char *pwd(MINODE *wd) 
+int pwd(MINODE *wd) 
 {
-  printf("pwd: READ HOW TO pwd in textbook!!!!\n");
-  if (wd == root){
+  if (wd == root)
+  {
     printf("/\n");
-    return;
+    return 0;
   }
+  rpwd(wd);
+  return 0;
 }
 
+int rpwd(MINODE* wd)
+{
+  if (wd == root)
+  {
+    return 0;
+  }
 
+  const int my_ino = wd->ino;
+  const int parent_ino = findino(wd, my_ino);
 
+  MINODE* pip = iget(dev, parent_ino);
+
+  char my_name[128];
+  findmyname(pip, my_ino, my_name);
+
+  rpwd(pip);
+  iput(pip);
+  printf("/%s", my_name);
+  return 0;
+}

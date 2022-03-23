@@ -7,33 +7,34 @@
 #include <libgen.h>
 #include <sys/stat.h>
 #include <time.h>
+#include <unistd.h>
 
 #include "type.h"
 
-/**** globals defined in main.c file ****/
-extern MINODE minode[NMINODE];
-extern MINODE *root;
-extern PROC   proc[NPROC], *running;
+MINODE *root;
+MINODE minode[NMINODE];
+PROC   proc[NPROC], *running;
 
-extern char gpath[128];
-extern char *name[64];
-extern int n;
+char gpath[128]; // global for tokenized components
+char *name[64];  // assume at most 64 components in pathname
+int  n;         // number of component strings
 
-extern int fd, dev;
-extern int nblocks, ninodes, bmap, imap, iblk;
-
-extern char line[128], cmd[32], pathname[128];
+int nblocks, ninodes, bmap, imap, iblk;
+char line[128], cmd[32], pathname[128];
+int fd, dev;
 
 int get_block(int dev, int blk, char *buf)
 {
    lseek(dev, (long)blk*BLKSIZE, 0);
    read(dev, buf, BLKSIZE);
+   return 0;
 }   
 
 int put_block(int dev, int blk, char *buf)
 {
    lseek(dev, (long)blk*BLKSIZE, 0);
    write(dev, buf, BLKSIZE);
+   return 0;
 }   
 
 int tokenize(char *pathname)
@@ -56,6 +57,7 @@ int tokenize(char *pathname)
   for (i= 0; i<n; i++)
     printf("%s  ", name[i]);
   printf("\n");
+  return 0;
 }
 
 // return minode pointer to loaded INODE
@@ -96,6 +98,7 @@ MINODE *iget(int dev, int ino)
        mip->INODE = *ip; // memcopy
        return mip;
     }
+    return 0;
   }   
   printf("PANIC: no more free minodes\n");
   return 0;
@@ -137,6 +140,7 @@ void iput(MINODE *mip)
   put_block(mip->dev, block, buf);
    
   ******************************/
+ return;
 } 
 
 int search(MINODE *mip, char *name)
@@ -217,6 +221,7 @@ int findmyname(MINODE *parent, u32 myino, char myname[ ])
   // WRITE YOUR code here
   // search parent's data block for myino; SAME as search() but by myino
   // copy its name STRING to myname[ ]
+  return 0;
 }
 
 int findino(MINODE *mip, u32 *myino) // myino = i# of . return i# of ..
@@ -230,7 +235,7 @@ int findino(MINODE *mip, u32 *myino) // myino = i# of . return i# of ..
   char buf[BLKSIZE], *cp;
   DIR *dp;
 
-  getblock(mip->dev, mip->INODE.i_block[0], buf);
+  get_block(mip->dev, mip->INODE.i_block[0], buf);
   cp = buf;
   dp = (DIR *)cp;
   *myino = dp->inode;

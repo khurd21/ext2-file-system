@@ -11,22 +11,10 @@
 #include <time.h>
 
 #include "type.h"
+#include "util.h"
+#include "cd_ls_pwd.h"
 
-extern MINODE *iget();
-
-MINODE minode[NMINODE];
-MINODE *root;
-PROC   proc[NPROC], *running;
-
-char gpath[128]; // global for tokenized components
-char *name[64];  // assume at most 64 components in pathname
-int   n;         // number of component strings
-
-int fd, dev;
-int nblocks, ninodes, bmap, imap, iblk;
-char line[128], cmd[32], pathname[128];
-
-#include "cd_ls_pwd.c"
+char *disk = "images/diskimage";
 
 int init()
 {
@@ -49,6 +37,7 @@ int init()
     p->uid = p->gid = 0;
     p->cwd = 0;
   }
+  return 0;
 }
 
 // load root INODE and set root pointer to it
@@ -56,9 +45,21 @@ int mount_root()
 {  
   printf("mount_root()\n");
   root = iget(dev, 2);
+  return 0;
 }
 
-char *disk = "diskimage";
+int quit()
+{
+  int i;
+  MINODE *mip;
+  for (i=0; i<NMINODE; i++){
+    mip = &minode[i];
+    if (mip->refCount > 0)
+      iput(mip);
+  }
+  exit(0);
+}
+
 int main(int argc, char *argv[ ])
 {
   int ino;
@@ -125,16 +126,5 @@ int main(int argc, char *argv[ ])
     else if (strcmp(cmd, "quit")==0)
        quit();
   }
-}
-
-int quit()
-{
-  int i;
-  MINODE *mip;
-  for (i=0; i<NMINODE; i++){
-    mip = &minode[i];
-    if (mip->refCount > 0)
-      iput(mip);
-  }
-  exit(0);
+  return 0;
 }

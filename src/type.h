@@ -1,3 +1,5 @@
+#ifndef TYPE_H
+#define TYPE_H
 /*************** type.h file for LEVEL-1 ****************/
 typedef unsigned char  u8;
 typedef unsigned short u16;
@@ -37,3 +39,5 @@ typedef struct proc{
   int          gid;
   MINODE      *cwd;      // CWD directory pointer  
 }PROC;
+
+#endif
