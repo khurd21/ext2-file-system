@@ -14,7 +14,7 @@ extern char *name[64];
 extern int n;
 
 extern int fd, dev;
-extern int nblocks, ninodes, bmap, imap, iblk;
+extern int nblocks, ninodes, bmap, imap, iblk, inode_start;
 
 extern char line[128], cmd[32], pathname[128];
 
@@ -22,7 +22,7 @@ int get_block();
 int put_block();
 int tokenize();
 MINODE* iget();
-void iput();
+int iput();
 int search();
 int getino();
 int findmyname();

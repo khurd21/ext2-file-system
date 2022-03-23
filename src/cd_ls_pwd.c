@@ -7,14 +7,23 @@
 #include "util.h"
 #include "cd_ls_pwd.h"
 
-int cd()
+int cd(char* pathname)
 {
   // READ Chapter 11.7.3 HOW TO chdir
   const int ino = getino(pathname);
+  if (ino < 0)
+  {
+    printf("inode not found.\n");
+    return -1;
+  }
+
   MINODE* mip = iget(dev, ino);
+  printf("MINODE i_mode: %d\n", mip->INODE.i_mode);
+  printf("MINODE i_block:%u\n", mip->INODE.i_blocks);
   if (!S_ISDIR(mip->INODE.i_mode))
   {
-    printf("cd:%s is not a directory.\n", pathname);
+    printf("cd: %s is not a directory.\n", pathname);
+    return -1;
   }
   iput(running->cwd);
   running->cwd = mip;
@@ -104,6 +113,7 @@ int pwd(MINODE *wd)
     return 0;
   }
   rpwd(wd);
+  printf("\n");
   return 0;
 }
 
@@ -114,12 +124,12 @@ int rpwd(MINODE* wd)
     return 0;
   }
 
+  char my_name[128];
   const int my_ino = wd->ino;
-  const int parent_ino = findino(wd, my_ino);
+  const int parent_ino = findino(wd, &my_ino);
 
   MINODE* pip = iget(dev, parent_ino);
 
-  char my_name[128];
   findmyname(pip, my_ino, my_name);
 
   rpwd(pip);

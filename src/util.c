@@ -19,7 +19,7 @@ char gpath[128]; // global for tokenized components
 char *name[64];  // assume at most 64 components in pathname
 int  n;         // number of component strings
 
-int nblocks, ninodes, bmap, imap, iblk;
+int nblocks, ninodes, bmap, imap, iblk, inode_start;
 char line[128], cmd[32], pathname[128];
 int fd, dev;
 
@@ -71,8 +71,8 @@ MINODE *iget(int dev, int ino)
 
   for (i=0; i<NMINODE; i++){
     mip = &minode[i];
-    if (mip->refCount && mip->dev == dev && mip->ino == ino){
-       mip->refCount++;
+    if (mip->ref_count && mip->dev == dev && mip->ino == ino){
+       mip->ref_count++;
        //printf("found [%d %d] as minode[%d] in core\n", dev, ino, i);
        return mip;
     }
@@ -80,9 +80,9 @@ MINODE *iget(int dev, int ino)
     
   for (i=0; i<NMINODE; i++){
     mip = &minode[i];
-    if (mip->refCount == 0){
+    if (mip->ref_count == 0){
        //printf("allocating NEW minode[%d] for [%d %d]\n", i, dev, ino);
-       mip->refCount = 1;
+       mip->ref_count = 1;
        mip->dev = dev;
        mip->ino = ino;
 
@@ -98,27 +98,42 @@ MINODE *iget(int dev, int ino)
        mip->INODE = *ip; // memcopy
        return mip;
     }
-    return 0;
   }   
   printf("PANIC: no more free minodes\n");
-  return 0;
+  return NULL;
 }
 
-void iput(MINODE *mip)
+int iput(MINODE *mip)
 {
  int i, block, offset;
  char buf[BLKSIZE];
  INODE *ip;
 
  if (mip==0) 
-     return;
+     return -1;
 
- mip->refCount--;
- 
- if (mip->refCount > 0) return;
- if (!mip->dirty)       return;
+ mip->ref_count--;
+
+ if (mip->ref_count > 0)
+ {
+    return -1;
+ }
+ if (!mip->dirty)
+ {
+   return -1;
+ }
  
  /* write INODE back to disk */
+  block = ((mip->ino - 1) / 8) + inode_start;
+  offset = (mip->ino - 1) % 8;
+
+  // first get the block containing this inode
+  get_block(mip->dev, block, buf);
+
+  ip = (INODE *)buf + offset;
+  *ip = mip->INODE;
+
+  put_block(mip->dev, block, buf);
  /**************** NOTE ******************************
   For mountroot, we never MODIFY any loaded INODE
                  so no need to write it back
@@ -140,7 +155,7 @@ void iput(MINODE *mip)
   put_block(mip->dev, block, buf);
    
   ******************************/
- return;
+ return 0;
 } 
 
 int search(MINODE *mip, char *name)
@@ -155,22 +170,25 @@ int search(MINODE *mip, char *name)
 
    /*** search for name in mip's data blocks: ASSUME i_block[0] ONLY ***/
 
-   get_block(dev, ip->i_block[0], sbuf);
-   dp = (DIR *)sbuf;
-   cp = sbuf;
-   printf("  ino   rlen  nlen  name\n");
+   for (int i = 0; i < ip->i_blocks; ++i)
+   {
+      get_block(dev, ip->i_block[i], sbuf);
+      dp = (DIR *)sbuf;
+      cp = sbuf;
+      printf("  ino   rlen  nlen  name\n");
 
-   while (cp < sbuf + BLKSIZE){
-     strncpy(temp, dp->name, dp->name_len);
-     temp[dp->name_len] = 0;
-     printf("%4d  %4d  %4d    %s\n", 
+      while (cp < sbuf + BLKSIZE){
+         strncpy(temp, dp->name, dp->name_len);
+         temp[dp->name_len] = 0;
+         printf("%4d  %4d  %4d    %s\n", 
            dp->inode, dp->rec_len, dp->name_len, dp->name);
-     if (strcmp(temp, name)==0){
-        printf("found %s : ino = %d\n", temp, dp->inode);
-        return dp->inode;
-     }
-     cp += dp->rec_len;
-     dp = (DIR *)cp;
+         if (strcmp(temp, name)==0){
+            printf("found %s : ino = %d\n", temp, dp->inode);
+            return dp->inode;
+         }
+         cp += dp->rec_len;
+         dp = (DIR *)cp;
+      }
    }
    return 0;
 }
@@ -192,7 +210,7 @@ int getino(char *pathname)
   else
      mip = running->cwd;
 
-  mip->refCount++;         // because we iput(mip) later
+  mip->ref_count++;         // because we iput(mip) later
   
   tokenize(pathname);
 
@@ -216,14 +234,38 @@ int getino(char *pathname)
 }
 
 // These 2 functions are needed for pwd()
+// TODO:
 int findmyname(MINODE *parent, u32 myino, char myname[ ]) 
 {
   // WRITE YOUR code here
   // search parent's data block for myino; SAME as search() but by myino
   // copy its name STRING to myname[ ]
-  return 0;
+  // same methods as search, use inode to find name
+  // i blocks treat files and dirs the same. We can utilize search
+  // but instead of searching for the name, we compare inodes.
+  char buf[BLKSIZE];
+  MINODE* mip = parent;
+  for (int i = 0; i < parent->INODE.i_blocks; ++i)
+  {
+     get_block(dev, parent->INODE.i_block[i], buf);
+     DIR* dp = (DIR*)buf;
+     char* cp = buf;
+     while (cp < buf + BLKSIZE)
+     {
+        if (dp->inode == myino)
+        {
+           strncpy(myname, dp->name, dp->name_len);
+           myname[dp->name_len] = '\0';
+           return 0;
+        }
+        cp += dp->rec_len;
+        dp = (DIR*)cp;
+     }
+  }
+  return -1;
 }
 
+// TODO:
 int findino(MINODE *mip, u32 *myino) // myino = i# of . return i# of ..
 {
   // mip points at a DIR minode

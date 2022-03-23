@@ -27,7 +27,7 @@ int init()
   for (i=0; i<NMINODE; i++){
     mip = &minode[i];
     mip->dev = mip->ino = 0;
-    mip->refCount = 0;
+    mip->ref_count = 0;
     mip->mounted = 0;
     mip->mptr = 0;
   }
@@ -54,7 +54,7 @@ int quit()
   MINODE *mip;
   for (i=0; i<NMINODE; i++){
     mip = &minode[i];
-    if (mip->refCount > 0)
+    if (mip->ref_count > 0)
       iput(mip);
   }
   exit(0);
@@ -96,12 +96,12 @@ int main(int argc, char *argv[ ])
 
   init();  
   mount_root();
-  printf("root refCount = %d\n", root->refCount);
+  printf("root ref_count = %d\n", root->ref_count);
 
   printf("creating P0 as running process\n");
   running = &proc[0];
   running->cwd = iget(dev, 2);
-  printf("root refCount = %d\n", root->refCount);
+  printf("root ref_count = %d\n", root->ref_count);
 
   // WRTIE code here to create P1 as a USER process
   
@@ -120,7 +120,7 @@ int main(int argc, char *argv[ ])
     if (strcmp(cmd, "ls")==0)
        ls(pathname);
     else if (strcmp(cmd, "cd")==0)
-       cd();
+       cd(pathname);
     else if (strcmp(cmd, "pwd")==0)
        pwd(running->cwd);
     else if (strcmp(cmd, "quit")==0)

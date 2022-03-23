@@ -25,7 +25,7 @@ DIR   *dp;
 typedef struct minode{
   INODE INODE;           // INODE structure on disk
   int dev, ino;          // (dev, ino) of INODE
-  int refCount;          // in use count
+  int ref_count;          // in use count
   int dirty;             // 0 for clean, 1 for modified
 
   int mounted;           // for level-3
