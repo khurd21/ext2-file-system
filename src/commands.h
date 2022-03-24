@@ -1,7 +1,7 @@
-#ifndef CD_LS_PWD_H
-#define CD_LS_PWD_H
+#ifndef COMMANDS_H
+#define COMMANDS_H
 
-/**** cd_ls_pwd.h file ****/
+/**** cd_ls_pwd.c ****/
 
 int cd();
 int ls_file();

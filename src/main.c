@@ -12,7 +12,7 @@
 
 #include "type.h"
 #include "util.h"
-#include "cd_ls_pwd.h"
+#include "commands.h"
 
 char *disk = "images/diskimage";
 

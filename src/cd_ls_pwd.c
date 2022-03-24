@@ -4,9 +4,10 @@
 #include <ext2fs/ext2fs.h>
 #include <fcntl.h>
 #include <libgen.h>
+#include <time.h>
+#include "commands.h"
 #include "type.h"
 #include "util.h"
-#include "cd_ls_pwd.h"
 
 int cd(char* pathname)
 {
@@ -76,7 +77,10 @@ int ls_file(MINODE *mip, char *name)
   // print time: incompatible pointer type, debugger throws a
   // [-Wincompatible-pointer-type]
   // Ur seg fault here. You had i_ctime instead of i_mtime :)
-  strcpy(ftime, ctime((time_t*)&ip->i_mtime));
+  // strcpy(ftime, ctime((time_t*)&ip->i_atime));
+  time_t mytime = ip->i_ctime;
+  strcpy(ftime, ctime(&mytime));
+
   ftime[strlen(ftime) - 1] = '\0'; // kill \n at end
   printf("%s ", ftime);
 
