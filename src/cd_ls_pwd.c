@@ -6,6 +6,7 @@
 #include "type.h"
 #include "util.h"
 #include "cd_ls_pwd.h"
+#include "libgen.h"
 
 int cd(char* pathname)
 {
@@ -39,9 +40,53 @@ int ls_file(MINODE *mip, char *name)
     3- to do ls -l on this INODE: show [dev, ino] after the name field
   */
  
-  printf("ls_file: to be done: READ textbook!!!!\n");
-  // READ Chapter 11.7.3 HOW TO ls
-  // utilize the INODE struct information to display all information from the file
+  // Utilized Chapter 8.6.7 The ls Program
+
+  char ftime[64];
+  char *t1 = "xwrxwrxwr-------";
+  char *t2 = "----------------";
+
+  // step 1: get the INODE information
+  INODE *ip = &mip->INODE;
+
+  if (S_ISREG(ip->i_mode))
+    printf("%c",'-');
+  if (S_ISDIR(ip->i_mode))
+    printf("%c",'d');
+  if (S_ISLNK(ip->i_mode))
+    printf("%c",'l');
+
+  for (int i = 8; i >= 0; i--)
+  {
+    if (ip->i_mode & (1 << i)) // print r|w|x
+      printf("%c", t1[i]);
+    else
+      printf("%c", t2[i]);
+  }
+ 
+  printf("%4d ", ip->i_links_count);
+  printf("%4d ", ip->i_gid);
+  printf("%4d ", ip->i_uid);
+  printf("%4d ", ip->i_size);
+
+  // print time
+  strcpy(ftime, ctime(&ip->i_ctime));
+  ftime[strlen(ftime) - 1] = 0; // kill \n at end
+  printf("%s ", ftime);
+
+  // print name
+  printf("%s\n", basename(name));
+
+  // print -> linkname if symbolic file 
+  // NOT SURE ABOUT THIS PART
+  if (S_ISLNK(ip->i_mode))  
+  {
+    char buf[BLKSIZE];
+    get_block(dev, ip->i_block[0], buf);
+    printf(" -> %s\n", buf);
+  }
+
+  printf("\n");
   return 0;
 }
 
@@ -71,15 +116,16 @@ int ls_dir(MINODE *mip)
 
   // if there is a file, need to call ls_file()  ?
   while (cp < buf + BLKSIZE){
-     strncpy(temp, dp->name, dp->name_len);
-     temp[dp->name_len] = 0;
-
+    strncpy(temp, dp->name, dp->name_len);
+    temp[dp->name_len] = 0;
     MINODE* child_mip = iget(dev, dp->inode);
-    // TODO: STOPPED HERE 
-     printf("%s  ", temp);
 
-     cp += dp->rec_len;
-     dp = (DIR *)cp;
+    // ADDED THESE TWO LINES
+    ls_file(child_mip, temp);
+    iput(child_mip);
+
+    cp += dp->rec_len;
+    dp = (DIR *)cp;
   }
   printf("\n");
   return 0;
@@ -93,6 +139,13 @@ int ls(char *pathname) // will use the inodes without the use of stat to obtain 
   */
 
   // Added additional code below from lecture
+
+  // check if pathname is empty
+  if (strcmp(pathname, "") == 0)
+  {
+    ls_dir(running->cwd);
+    return 0;
+  }
 
   int ino = getino(pathname);
   MINODE *mip = iget(dev, ino);
