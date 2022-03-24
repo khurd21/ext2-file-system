@@ -4,7 +4,7 @@
 ### C ###
 # Prerequisites
 *.d
-
+**/bin
 # Object files
 *.o
 *.ko
@@ -154,3 +154,6 @@ tags
 [._]*.un~
 
 # End of https://www.toptal.com/developers/gitignore/api/c,c++,git,linux,macos,vim
+
+# VSCODE
+**/.vscode
