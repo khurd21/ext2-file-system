@@ -68,11 +68,14 @@ int ls_dir(MINODE *mip)
   get_block(dev, mip->INODE.i_block[0], buf);
   dp = (DIR *)buf;
   cp = buf;
-  
+
+  // if there is a file, need to call ls_file()  ?
   while (cp < buf + BLKSIZE){
      strncpy(temp, dp->name, dp->name_len);
      temp[dp->name_len] = 0;
-	
+
+    MINODE* child_mip = iget(dev, dp->inode);
+    // TODO: STOPPED HERE 
      printf("%s  ", temp);
 
      cp += dp->rec_len;
