@@ -11,6 +11,11 @@
 int cd(char* pathname)
 {
   // READ Chapter 11.7.3 HOW TO chdir
+  if (strcmp(pathname, "") == 0)
+  {
+    strcat(pathname, "/");
+  }
+
   const int ino = getino(pathname);
   if (ino < 0)
   {
@@ -66,11 +71,11 @@ int ls_file(MINODE *mip, char *name)
   printf("%4d ", ip->i_links_count);
   printf("%4d ", ip->i_gid);
   printf("%4d ", ip->i_uid);
-  printf("%4d ", ip->i_size);
+  printf("%5d ", ip->i_size);
 
   // print time: incompatible pointer type, debugger throws a
   // [-Wincompatible-pointer-type]
-  // Ur seg fault here. You had i_ctime instead of mtime :)
+  // Ur seg fault here. You had i_ctime instead of i_mtime :)
   strcpy(ftime, ctime((time_t*)&ip->i_mtime));
   ftime[strlen(ftime) - 1] = '\0'; // kill \n at end
   printf("%s ", ftime);
@@ -103,27 +108,35 @@ int ls_dir(MINODE *mip)
 
 
   // will utilize same concept as search function from lab5
-  printf("ls_dir: list CWD's file names; YOU FINISH IT as ls -l\n");
+  // printf("ls_dir: list CWD's file names; YOU FINISH IT as ls -l\n");
 
   char buf[BLKSIZE];
   char temp[256];
   char *cp;
   DIR *dp;
+  INODE* ip = &mip->INODE;
 
-  get_block(dev, mip->INODE.i_block[0], buf);
-  dp = (DIR *)buf;
-  cp = buf;
+  for (int i = 0; i < ip->i_blocks; ++i)
+  {
+    get_block(dev, ip->i_block[i], buf);
+    dp = (DIR *)buf;
+    cp = buf;
 
-  // if there is a file, need to call ls_file()  ?
-  while (cp < buf + BLKSIZE){
-    MINODE* child_mip = iget(dev, dp->inode);
-    // ADDED THESE TWO LINES
-    // YOUR BUG IS HERE BRO :(
-    ls_file(child_mip, dp->name);
-    iput(child_mip);
+    // if there is a file, need to call ls_file()  ?
+    while (cp < buf + BLKSIZE){
+      MINODE* child_mip = iget(dev, dp->inode);
+      if (child_mip->ino == 0)
+      {
+        break;
+      }
+      // ADDED THESE TWO LINES
+      // YOUR BUG IS HERE BRO :(
+      ls_file(child_mip, dp->name);
+      iput(child_mip);
 
-    cp += dp->rec_len;
-    dp = (DIR *)cp;
+      cp += dp->rec_len;
+      dp = (DIR *)cp;
+    }
   }
   printf("\n");
   return 0;
