@@ -3,10 +3,10 @@
 #include <sys/stat.h>
 #include <ext2fs/ext2fs.h>
 #include <fcntl.h>
+#include <libgen.h>
 #include "type.h"
 #include "util.h"
 #include "cd_ls_pwd.h"
-#include "libgen.h"
 
 int cd(char* pathname)
 {
@@ -48,13 +48,12 @@ int ls_file(MINODE *mip, char *name)
 
   // step 1: get the INODE information
   INODE *ip = &mip->INODE;
-
   if (S_ISREG(ip->i_mode))
-    printf("%c",'-');
+    printf("-");
   if (S_ISDIR(ip->i_mode))
-    printf("%c",'d');
+    printf("d");
   if (S_ISLNK(ip->i_mode))
-    printf("%c",'l');
+    printf("l");
 
   for (int i = 8; i >= 0; i--)
   {
@@ -69,23 +68,23 @@ int ls_file(MINODE *mip, char *name)
   printf("%4d ", ip->i_uid);
   printf("%4d ", ip->i_size);
 
-  // print time
-  strcpy(ftime, ctime(&ip->i_ctime));
-  ftime[strlen(ftime) - 1] = 0; // kill \n at end
+  // print time: incompatible pointer type, debugger throws a
+  // [-Wincompatible-pointer-type]
+  // Ur seg fault here. You had i_ctime instead of mtime :)
+  strcpy(ftime, ctime((time_t*)&ip->i_mtime));
+  ftime[strlen(ftime) - 1] = '\0'; // kill \n at end
   printf("%s ", ftime);
 
   // print name
-  printf("%s\n", basename(name));
+  printf("%s", name);
 
   // print -> linkname if symbolic file 
   // NOT SURE ABOUT THIS PART
+  // I got u bro. zip zip
   if (S_ISLNK(ip->i_mode))  
   {
-    char buf[BLKSIZE];
-    get_block(dev, ip->i_block[0], buf);
-    printf(" -> %s\n", buf);
+    printf(" -> %s", (char*)ip->i_block);
   }
-
   printf("\n");
   return 0;
 }
@@ -106,9 +105,10 @@ int ls_dir(MINODE *mip)
   // will utilize same concept as search function from lab5
   printf("ls_dir: list CWD's file names; YOU FINISH IT as ls -l\n");
 
-  char buf[BLKSIZE], temp[256];
-  DIR *dp;
+  char buf[BLKSIZE];
+  char temp[256];
   char *cp;
+  DIR *dp;
 
   get_block(dev, mip->INODE.i_block[0], buf);
   dp = (DIR *)buf;
@@ -116,12 +116,10 @@ int ls_dir(MINODE *mip)
 
   // if there is a file, need to call ls_file()  ?
   while (cp < buf + BLKSIZE){
-    strncpy(temp, dp->name, dp->name_len);
-    temp[dp->name_len] = 0;
     MINODE* child_mip = iget(dev, dp->inode);
-
     // ADDED THESE TWO LINES
-    ls_file(child_mip, temp);
+    // YOUR BUG IS HERE BRO :(
+    ls_file(child_mip, dp->name);
     iput(child_mip);
 
     cp += dp->rec_len;
@@ -148,14 +146,18 @@ int ls(char *pathname) // will use the inodes without the use of stat to obtain 
   }
 
   int ino = getino(pathname);
+  if (ino < 0)
+  {
+    return 0;
+  }
+  dev = root->dev;
   MINODE *mip = iget(dev, ino);
-
   mode_t mode = mip->INODE.i_mode; 
 
   if (S_ISDIR(mode))
     ls_dir(mip);
   else
-    ls_file(mip, pathname);
+    ls_file(mip, basename(pathname));
 
   iput(mip);
   return 0;

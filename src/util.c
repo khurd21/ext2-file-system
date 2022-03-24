@@ -177,7 +177,7 @@ int search(MINODE *mip, char *name)
       cp = sbuf;
       printf("  ino   rlen  nlen  name\n");
 
-      while (cp < sbuf + BLKSIZE){
+      while (cp < sbuf + BLKSIZE && dp->inode != 0){
          strncpy(temp, dp->name, dp->name_len);
          temp[dp->name_len] = 0;
          printf("%4d  %4d  %4d    %s\n", 
@@ -213,7 +213,6 @@ int getino(char *pathname)
   mip->ref_count++;         // because we iput(mip) later
   
   tokenize(pathname);
-
   for (i=0; i<n; i++){
       printf("===========================================\n");
       printf("getino: i=%d name[%d]=%s\n", i, i, name[i]);
@@ -223,12 +222,11 @@ int getino(char *pathname)
       if (ino==0){
          iput(mip);
          printf("name %s does not exist\n", name[i]);
-         return 0;
+         return -1;
       }
       iput(mip);
       mip = iget(dev, ino);
    }
-
    iput(mip);
    return ino;
 }
