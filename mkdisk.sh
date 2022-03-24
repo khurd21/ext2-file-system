@@ -7,7 +7,7 @@ sudo mke2fs -b 1024 diskimage 1440
 
 sudo mount diskimage /mnt
 
-(cd /mnt; sudo mkdir dir1 dir2 dir1/dir3; sudo touch file1 file2; ls -l)
+(cd /mnt; sudo mkdir dir1 dir2 dir1/dir3; sudo touch file1 file2; ls -al)
 
 sudo umount /mnt
 
