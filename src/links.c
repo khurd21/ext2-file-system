@@ -64,9 +64,15 @@ int unlink(char *pathname)
     MINODE *mip = iget(dev, ino);
 
     // check it's a REG or symbolic LNK file; can not be a DIR
-    if (!S_ISDIR(mip->INODE.i_mode) && (S_ISREG(mip->INODE.i_mode) || S_ISLNK(mip->INODE.i_mode)))
+    if (S_ISDIR(mip->INODE.i_mode))
     {
         printf("unlink: cannot unlink a directory.\n");
+        return -1;
+    }
+
+    if (!S_ISLNK(mip->INODE.i_mode))
+    {
+        printf("unlink: cannot unlink a symbolic link.\n");
         return -1;
     }
 
@@ -98,12 +104,27 @@ int unlink(char *pathname)
     {
         // deallocate all data blocks in INODE;
         // deallocate INODE;
-        // WRITE CODE HERE
+        inode_trucate(pmip); // could be mip instead
     }
 
     iput(mip); // release mip
 
     return 0;
+}
+
+int inode_trucate(MINODE *pmip)
+{
+    // THIS FUNCTION WILL HAVE TO HAVE CHANAGES TO IT TO COUNT FOR INDIRECT BLOCKS
+    // IN LEVEL 2 AS THIS ONLY COUNTS FOR 12 DIRECT BLOCKS
+    int i;
+    INODE *ip = &pmip->INODE;
+    for (i = 0; i < 12; i++)
+    {
+        if (ip->i_block[i] == 0)
+            continue;
+        bdealloc(dev, ip->i_block[i]);
+        ip->i_block[i] = 0;
+    }
 }
 
 int symlink(char *pathname)
@@ -114,7 +135,7 @@ int symlink(char *pathname)
     1 - divide pathname into old_file and new_file
     2 - check: old_file must exist and new_file must not exist yet;
     3 - creat new_file; change new_file to LNK (symbolic link) type;
-    4 - // assume lenght of old_file name <= 60 chars
+    4 - // assume length of old_file name <= 60 chars
         store old_file name in new_file's INODE.i_block[ ] area.
         set file size to length of old_file name
         mark new_file's minode dirty;

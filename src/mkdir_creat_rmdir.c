@@ -58,7 +58,21 @@ int ialloc(int dev)
 int balloc(int dev)
 {
     // allocates a free disk block (number) from a device
-    // WRITE CODE HERE
+    int i;
+    char buf[BLKSIZE];
+    MTABLE *mp = (MTABLE *)get_mtable(dev);
+    get_block(dev, mp->bmap, buf);
+    for (i = 0; i < mp->nblocks; i++)
+    {
+        if (tst_bit(buf, i) == 0) // order might differ as deallocation must happen
+        {
+            set_bit(buf, i);
+            put_block(dev, mp->bmap, buf);
+            decFreeInodes(dev);
+            return (i + 1);
+        }
+    }
+    return 0; // out of FREE inodes
 }
 
 int mkdir (char *pathname)
@@ -186,7 +200,7 @@ int enter_child(MINODE *pip, int ino, char *name) // kmkdir and creat will both 
     }
     refer to diagram on page 335 for more information
     
-    5,  If no space in existing data block(s)
+    5.  If no space in existing data block(s)
         Allocate a new data block; increment parent size by BLKSIZE
         Enter new entry as the first entry in the new data block with rec_len = BLKSIZE
 
@@ -195,9 +209,75 @@ int enter_child(MINODE *pip, int ino, char *name) // kmkdir and creat will both 
     6.  Write data block to disk; 
 
     */
-    // WRITE CODE HERE
-    return 0;
+    int i;
+    char buf[BLKSIZE];
 
+    // set the needed lengh for the new entry name
+    int need_length = 4 * ((8 + strlen(name) + 3) / 4); // a multiple of 4
+
+    for (i = 0; i < 12; i++)
+    {
+
+        // if the i_block[i] is 0, break
+        if (pip->INODE.i_block[i] == 0)
+            break;
+
+        // get the data block into buf[ ]
+        get_block(pip->dev, pip->INODE.i_block[i], buf);
+
+        // dp points to the last entry in the data block as DIR
+        DIR *dp = (DIR *)buf;
+
+        // cp points to the last entry in the data block as char
+        char *cp = buf;
+
+        // traverse the data block to find the last entry
+        while (cp + dp->rec_len < buf + BLKSIZE)
+        {
+            cp += dp->rec_len;
+            dp = (DIR *)cp;
+        }
+
+        // remain is the remaining space in the last entry
+        int ideal_length = 4 * ((8 + dp->name_len + 3) / 4);
+        int remain = dp->rec_len - ideal_length;
+
+        // if the remaining space is enough to enter the new entry
+        if (remain >= need_length)
+        {
+            dp->rec_len = ideal_length;
+            cp += dp->rec_len;
+            dp = (DIR *)cp;
+            dp->inode = ino;
+
+            dp->rec_len = remain;
+            dp->name_len = strlen(name);
+            strncpy(dp->name, name, dp->name_len);
+            put_block(pip->dev, pip->INODE.i_block[i], buf);
+            return 0;
+        }
+        else  // if the remaining space is not enough to enter the new entry
+        {
+            // allocate a new data block; increment parent size by BLKSIZE
+            int blk = balloc(pip->dev);
+            pip->INODE.i_size = BLKSIZE;
+            pip->INODE.i_block[i] = blk;
+            pip->dirty = 1;
+
+            get_block(pip->dev, blk, buf);
+            dp = (DIR *)buf;
+            cp = buf;
+            // CONFUSED ON THIS STEP
+
+            // enter the new entry as the first entry in the new data block with rec_len = BLKSIZE
+            dp->inode = ino;
+            dp->rec_len = BLKSIZE;
+            dp->name_len = strlen(name);
+            strncpy(dp->name, name, dp->name_len);
+            put_block(pip->dev, pip->INODE.i_block[i], buf);
+            return 0;
+        }
+    }
 }
 
 int creat (char *pathname)
@@ -311,8 +391,19 @@ int idalloc(int dev, int ino)
 int bdalloc(int dev, int bno)
 {
     // function deallocates a disk block (number) bno
-    // WRITE CODE HERE
+    int i;
+    char buf[BLKSIZE];
+    MTABLE *mp = (MTABLE *)get_mtable(dev);
+    if (mp->nblocks) // niodes global
+    {
+        printf("bnumber %d out of range\n", bno);
+        return -1;
+    }
 
+    get_block(dev, mp->bmap, buf);
+    clr_bit(buf, bno-1);
+    put_block(dev, mp->bmap, buf);
+    incFreeInodes(dev);
     return 0;
 }
 
