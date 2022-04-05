@@ -1,6 +1,8 @@
 # Created by https://www.toptal.com/developers/gitignore/api/c,c++,git,linux,macos,vim
 # Edit at https://www.toptal.com/developers/gitignore?templates=c,c++,git,linux,macos,vim
 
+bin/**
+
 ### C ###
 # Prerequisites
 *.d

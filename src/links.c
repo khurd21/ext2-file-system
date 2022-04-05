@@ -104,7 +104,7 @@ int unlink(char *pathname)
     {
         // deallocate all data blocks in INODE;
         // deallocate INODE;
-        inode_trucate(pmip); // could be mip instead
+        inode_truncate(pmip); // could be mip instead
     }
 
     iput(mip); // release mip
@@ -112,7 +112,7 @@ int unlink(char *pathname)
     return 0;
 }
 
-int inode_trucate(MINODE *pmip)
+int inode_truncate(MINODE *pmip)
 {
     // THIS FUNCTION WILL HAVE TO HAVE CHANAGES TO IT TO COUNT FOR INDIRECT BLOCKS
     // IN LEVEL 2 AS THIS ONLY COUNTS FOR 12 DIRECT BLOCKS
@@ -122,7 +122,7 @@ int inode_trucate(MINODE *pmip)
     {
         if (ip->i_block[i] == 0)
             continue;
-        bdealloc(dev, ip->i_block[i]);
+        bdalloc(dev, ip->i_block[i]);
         ip->i_block[i] = 0;
     }
 }

@@ -1,8 +1,8 @@
 /************* mkdir_creat_rmdir.c file **************/
 
-#include <sys/stat.h>
+// #include <sys/stat.h>
 #include <ext2fs/ext2fs.h>
-#include <fcntl.h>
+// #include <fcntl.h>
 #include <libgen.h>
 #include <time.h>
 #include "commands.h"
@@ -141,7 +141,7 @@ int kmkdir(MINODE* pmip, char* bname)
     dp->name[0] = '.';
 
     // make .. entry: pino=parent DIR ino, blk=allocated block
-    dp - (char *)dp + 12;
+    dp = (char *)dp + 12;
     dp->inode = pmip->ino;       // IN BOOK dp->inode = pino;
     dp->rec_len = BLKSIZE - 12;  // rec_len spans block
     dp->name_len = 2;
@@ -342,6 +342,7 @@ int kcreat(MINODE *pmip, int bname)
     iput(mip);                                          // write INODE to disk 
 
     // 3 - enter the child 
+    // TODO: bname should be char* type? Should it be something else?
     enter_child(pmip, ino, bname);
 
     return 0;
