@@ -460,7 +460,7 @@ int rmdir (char *pathname)
     return 0;
 }
 
-rm_child(MINODE *pmip, char *name)
+int rm_child(MINODE *pmip, char *name)
 {
     /*
 
