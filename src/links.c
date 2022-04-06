@@ -176,7 +176,11 @@ int readlink(char *file, char *buf)
     }
 
     // 2 - copy link's content to buf
-    strcpy(buf, mip->INODE.i_block);
+    // do we need to load all?
+    for (int i = 0; mip->INODE.i_blocks; ++i)
+    {
+        strcpy(buf, mip->INODE.i_block[0]);
+    }
 
     // 3 - return file size
     return mip->INODE.i_size;

@@ -17,10 +17,10 @@ int set_bit();
 int decFreeInodes();
 int ialloc();
 int balloc();
-int mkdir();
+int mymkdir();
 int kmkdir();
 int enter_child();
-int creat();
+int mycreat();
 int kcreat();
 int clr_bit();
 int incFreeInodes();
@@ -33,6 +33,7 @@ int rm_child();
 
 int link();
 int unlink();
+int inode_truncate();
 int symlink();
 int readlink();
 

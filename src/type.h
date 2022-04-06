@@ -49,6 +49,7 @@ typedef struct proc{
   OFT         *fd[NFD];
 }PROC;
 
+// Mount Table
 typedef struct mtable {
   int dev;              // device number; 0 for FREE
   int ninodes;          // from superblock

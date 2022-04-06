@@ -125,6 +125,10 @@ int main(int argc, char *argv[ ])
        pwd(running->cwd);
     else if (strcmp(cmd, "quit")==0)
        quit();
+    else if (strcmp(cmd, "mkdir") == 0)
+       mymkdir(pathname);
+    else if (strcmp(cmd, "rmdir") == 0)
+       rmdir(pathname);
   }
   return 0;
 }

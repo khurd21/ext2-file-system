@@ -118,7 +118,7 @@ int iput(MINODE *mip)
  {
     return -1;
  }
- if (!mip->dirty)
+ if (mip->dirty == 0)
  {
    return -1;
  }

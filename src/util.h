@@ -28,37 +28,4 @@ int getino();
 int findmyname();
 int findino();
 
-/**** links.c ****/
-int link();
-int unlink();
-int inode_truncate();
-int symlink();
-int readlink();
-
-/**** mkdir_creat_rmdir.c ****/
-int tst_bit();
-int set_bit();
-int devFreeInodes();
-int ialloc();
-int balloc();
-int mkdir();
-int kmkdir();
-int enter_child();
-int creat();
-int kcreat();
-int clr_bit();
-int incFreeInodes();
-int idalloc();
-int bdalloc();
-int rmdir();
-int rm_child();
-
-/**** cd_ls_pwd.c ****/
-int cd();
-int ls_file();
-int ls_dir();
-int ls();
-int pwd();
-int rpwd();
-
 #endif

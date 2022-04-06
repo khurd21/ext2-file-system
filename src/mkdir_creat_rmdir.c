@@ -1,8 +1,8 @@
 /************* mkdir_creat_rmdir.c file **************/
 
-// #include <sys/stat.h>
+#include <sys/stat.h>
 #include <ext2fs/ext2fs.h>
-// #include <fcntl.h>
+#include <fcntl.h>
 #include <libgen.h>
 #include <time.h>
 #include "commands.h"
@@ -39,14 +39,15 @@ int ialloc(int dev)
     int i;
     char buf[BLKSIZE];
     // use imap, ninodes in mount table of dev
-    MTABLE *mp = (MTABLE *)get_mtable(dev);
-    get_block(dev, mp->imap, buf);
-    for (i = 0; i < mp->ninodes; i++)
+    // MTABLE *mp = (MTABLE *)get_mtable(dev);
+    // mp->imap;
+    get_block(dev, imap, buf);
+    for (i = 0; i < ninodes; i++)
     {
         if (tst_bit(buf, i) == 0)
         {
             set_bit(buf, i);
-            put_block(dev, mp->imap, buf);
+            put_block(dev, imap, buf);
             // update free inode count in SUPER and GD
             decFreeInodes(dev);
             return (i + 1);
@@ -59,15 +60,16 @@ int balloc(int dev)
 {
     // allocates a free disk block (number) from a device
     int i;
-    char buf[BLKSIZE];
-    MTABLE *mp = (MTABLE *)get_mtable(dev);
-    get_block(dev, mp->bmap, buf);
-    for (i = 0; i < mp->nblocks; i++)
+    char buf[(int)BLKSIZE];
+    // MTABLE *mp = (MTABLE *)get_mtable(dev);
+    // mp->bmap;
+    get_block(dev, bmap, buf);
+    for (i = 0; i < nblocks; i++)
     {
         if (tst_bit(buf, i) == 0) // order might differ as deallocation must happen
         {
             set_bit(buf, i);
-            put_block(dev, mp->bmap, buf);
+            put_block(dev, bmap, buf);
             decFreeInodes(dev);
             return (i + 1);
         }
@@ -75,8 +77,11 @@ int balloc(int dev)
     return 0; // out of FREE inodes
 }
 
-int mkdir (char *pathname)
+int mymkdir(char *pathname)
 {
+    // TODO: 0 - absolute vs relative ???
+    dev = pathname[0] == '/' ? root->dev : running->cwd->dev;
+
     // 1 - divide the pathname into dirname and basename
     char temp[128];
     strcpy(temp, pathname);
@@ -102,7 +107,10 @@ int mkdir (char *pathname)
 
     // 4 - call kmkdir(pmip, basename) to create a DIR;
     kmkdir(pmip, bname);
-
+    ++pmip->INODE.i_links_count;
+    pmip->INODE.i_atime = time(0L);
+    pmip->dirty = 1; 
+    iput(pmip);
     return 0;
 }
 
@@ -115,6 +123,9 @@ int kmkdir(MINODE* pmip, char* bname)
     // 2 - create/setup INODE
     MINODE *mip = iget(dev, ino);
     INODE *ip = &mip->INODE;
+    // ip->i_atime = time(0);
+    // ip->i_ctime = time(0);
+    // ip->i_mtime = time(0);
     ip->i_mode = 0x41ED;                                // 040755: DIR type and permissions
     ip->i_uid = running->uid;                           // owner uid
     ip->i_gid = running->gid;                           // group Id
@@ -132,23 +143,28 @@ int kmkdir(MINODE* pmip, char* bname)
     // 3 - Create data block for new DIR containing . and .. entries  
     char buf[BLKSIZE];
     bzero(buf, BLKSIZE);
+    get_block(dev, blk, buf); // This was not called b4
     DIR *dp = (DIR *)buf;
+    char *cp = buf;
 
     // make . entry
     dp->inode = ino;
     dp->rec_len = 12;
     dp->name_len = 1;
     dp->name[0] = '.';
+    cp += dp->rec_len;
+    dp = (DIR*)cp;
 
     // make .. entry: pino=parent DIR ino, blk=allocated block
-    dp = (char *)dp + 12;
+    // dp = (char *)dp + 12;
     dp->inode = pmip->ino;       // IN BOOK dp->inode = pino;
     dp->rec_len = BLKSIZE - 12;  // rec_len spans block
     dp->name_len = 2;
-    dp->name[0] = dp->name[1] = '.';
+    dp->name[0] = '.';
+    dp->name[1] = '.';
     put_block(dev, blk, buf);
 
-    // enter the child
+    // enter the child... yikes
     enter_child(pmip, ino, bname);
 
     return 0;
@@ -209,13 +225,12 @@ int enter_child(MINODE *pip, int ino, char *name) // kmkdir and creat will both 
     6.  Write data block to disk; 
 
     */
-    int i;
     char buf[BLKSIZE];
 
     // set the needed lengh for the new entry name
     int need_length = 4 * ((8 + strlen(name) + 3) / 4); // a multiple of 4
 
-    for (i = 0; i < 12; i++)
+    for (int i = 0; i < 12; i++)
     {
 
         // if the i_block[i] is 0, break
@@ -280,7 +295,7 @@ int enter_child(MINODE *pip, int ino, char *name) // kmkdir and creat will both 
     }
 }
 
-int creat (char *pathname)
+int mycreat(char *pathname)
 {
     // 1 - divide the pathname into dirname and basename
     char temp[128];
@@ -372,17 +387,17 @@ int idalloc(int dev, int ino)
 {
     int i;
     char buf[BLKSIZE];
-    MTABLE *mp = (MTABLE *)get_mtable(dev);
-    if (mp->ninodes) // niodes global
+    // MTABLE *mp = (MTABLE *)get_mtable(dev);
+    if (ninodes) // niodes global
     {
         printf("inumber %d out of range\n", ino);
         return -1;
     }
     // get inode bitmap block
-    get_block(dev, mp->imap, buf);
+    get_block(dev, imap, buf);
     clr_bit(buf, ino-1);
     // write buf back 
-    put_block(dev, mp->imap, buf);
+    put_block(dev, imap, buf);
     // update free inode count in SUPER and GD
     incFreeInodes(dev);
 
@@ -394,16 +409,16 @@ int bdalloc(int dev, int bno)
     // function deallocates a disk block (number) bno
     int i;
     char buf[BLKSIZE];
-    MTABLE *mp = (MTABLE *)get_mtable(dev);
-    if (mp->nblocks) // niodes global
+    // MTABLE *mp = (MTABLE *)get_mtable(dev);
+    if (nblocks) // niodes global
     {
         printf("bnumber %d out of range\n", bno);
         return -1;
     }
 
-    get_block(dev, mp->bmap, buf);
+    get_block(dev, bmap, buf);
     clr_bit(buf, bno-1);
-    put_block(dev, mp->bmap, buf);
+    put_block(dev, bmap, buf);
     incFreeInodes(dev);
     return 0;
 }
@@ -433,17 +448,77 @@ int rmdir (char *pathname)
         printf("%s is busy\n", pathname);
         return -1;
     }
-    
+
+    if (mip->INODE.i_links_count == 2)
+    {
+        char buf[BLKSIZE];
+        for (int i = 0; i < 12; ++i)
+        {
+            if (mip->INODE.i_block[i] == 0)
+            {
+                break;
+            }
+            const int dev = mip->dev;
+            const uint block = mip->INODE.i_block[i];
+            get_block(dev, block, buf);
+            DIR* mydp = (DIR*)buf;
+            char* cp = buf;
+            while (cp < buf + BLKSIZE)
+            {
+                strncpy(temp, mydp->name, mydp->name_len);
+                temp[dp->name_len] = '\0';
+                
+                if (strcmp(temp, ".") != 0 && strcmp(temp, "..") != 0)
+                {
+                    return -1;
+                }
+
+                cp += mydp->rec_len;
+                dp = (DIR*)cp;
+            }
+        }
+    }
+
+    if (mip->INODE.i_mode & 0777 || mip->INODE.i_mode & 0755)
+    {
+        printf("Incorrect access permissions: %o\n", mip->INODE.i_mode);
+        printf("Expected: %o | %o\n", 0777, 0755);
+        return -1;
+    }
+
+    if (running->uid != mip->INODE.i_uid && running->uid != 0)
+    {
+        printf("You do not have permission to delete this directory\n");
+        return -1;
+    }
+
+    for (int i = 0; i < mip->INODE.i_blocks; ++i)
+    {
+        if (mip->INODE.i_block[i] == 0)
+        {
+            break;
+        }
+        bdalloc(mip->dev, mip->INODE.i_block[i]);
+    }
+    idalloc(mip->dev, mip->ino);
+    iput(mip);
+    mip->ref_count = 0;
+    mip->dirty = 1;
 
     // verify DIR is empty (transverse data blocks for number of entries = 2)
     // WRITE CODE HERE
 
     // 3 - get parent's ino and inode
-    int pino = findino();
-    MINODE *pmip = iget(dev, pino);
+    int pino = getino(dname);
+    if (pino == -1)
+    {
+        printf("parent directory does not exist\n");
+        return -1;
+    }
+    MINODE *pmip = iget(mip->dev, pino);
 
     // 4 - get name from parent DIR's data block
-    findmyname(pmip, ino, bname);
+    // findmyname(pmip, ino, bname);
 
     // 5 - remove name from parent directory
     rm_child(pmip, ino);
@@ -483,6 +558,64 @@ int rm_child(MINODE *pmip, char *name)
         
     */
     // WRITE CODE HERE
-
-    return 0;
+    DIR* lastdp = NULL;
+    for (int i = 0; i < 12; ++i)
+    {
+        if (pmip->INODE.i_block[i] == 0)
+        {
+            break;
+        }
+        char buf[BLKSIZE];
+        char temp[BLKSIZE >> 2];
+        get_block(pmip->dev, pmip->INODE.i_block[i], buf);
+        DIR* mydp = (DIR*)buf;
+        char* cp = buf;
+        while (cp < buf + BLKSIZE)
+        {
+            strncpy(temp, mydp->name, mydp->name_len);
+            temp[dp->name_len] = '\0';
+            if (strcmp(temp, name) == 0)
+            {
+                if (mydp->rec_len == BLKSIZE)
+                {
+                    if (cp == buf)
+                    {
+                        bdalloc(pmip->dev, pmip->INODE.i_block[i]);
+                        pmip->INODE.i_size -= BLKSIZE;
+                        while (i < 12 && pmip->INODE.i_block[i] == 0)
+                        {
+                            ++i;
+                            get_block(pmip->dev, pmip->INODE.i_block[i], buf);
+                            put_block(pmip->dev, pmip->INODE.i_block[i], buf);
+                        }
+                    }
+                    else
+                    {
+                        lastdp->rec_len += mydp->rec_len; 
+                        put_block(pmip->dev, pmip->INODE.i_block[i], buf);
+                    }
+                }
+                else
+                {
+                    DIR* finaldp = (DIR*)buf;
+                    char* finalcp = buf;
+                    while (finalcp + finaldp->rec_len < buf + BLKSIZE)
+                    {
+                        finalcp += finaldp->rec_len;
+                        finaldp = (DIR*)finalcp;
+                    }
+                    finaldp->rec_len += mydp->rec_len;
+                    memmove(cp, cp + mydp->rec_len, cp + mydp->rec_len - buf + BLKSIZE);
+                    put_block(pmip->dev, pmip->INODE.i_block[i], buf);
+                }
+                pmip->dirty = 1;
+                iput(pmip);
+                return 0;
+            }
+            lastdp = mydp;
+            cp += mydp->rec_len;
+            dp = (DIR*)cp;
+        }
+    }
+    return -1;
 }
