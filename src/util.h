@@ -23,7 +23,7 @@ extern char line[128], cmd[32], pathname[128];
 int get_block();
 int put_block();
 int tokenize();
-MINODE* mialloc()
+MINODE* mialloc();
 int midealloc(MINODE *);
 MINODE* iget();
 int iput();

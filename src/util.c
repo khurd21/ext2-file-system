@@ -61,8 +61,7 @@ int tokenize(char *pathname)
     nname++;
     s = strtok(0, "/");
   }
-  name[nname] = 0;
-  
+    printf("Tokenized pathname: \n");
   for (i= 0; i<nname; i++)
     printf("%s  ", name[i]);
   printf("\n");
@@ -244,7 +243,7 @@ int getino(char *pathname)
   mip->ref_count++;         // because we iput(mip) later
   
   tokenize(pathname);
-  for (i=0; i<nname; i++){
+  for (i=0; i<nname; i++) {
      if (S_ISDIR(mip->INODE.i_mode == 0))
      {
         printf("%s is not a directory.\n");
@@ -256,10 +255,9 @@ int getino(char *pathname)
       printf("getino: i=%d name[%d]=%s\n", i, i, name[i]);
  
       ino = search(mip, name[i]);
-
       if (ino==0){
-         iput(mip);
          printf("name %s does not exist\n", name[i]);
+         iput(mip);
          return -1;
       }
       iput(mip);
