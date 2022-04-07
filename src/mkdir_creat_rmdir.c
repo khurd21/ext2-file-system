@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <libgen.h>
 #include <time.h>
+#include <string.h>
 #include "commands.h"
 #include "type.h"
 #include "util.h"
@@ -83,14 +84,23 @@ int mymkdir(char *pathname)
     dev = pathname[0] == '/' ? root->dev : running->cwd->dev;
 
     // 1 - divide the pathname into dirname and basename
-    char temp[128];
-    strcpy(temp, pathname);
-    char *dname = dirname(temp);
-    strcpy(temp, pathname);
-    char *bname = basename(temp);
+    char string1[128];
+    char string2[128];
+
+    // Probably doesnt do what we think it will do
+    strcpy(string1, pathname);
+    char* dname = dirname(string1);
+    strcpy(string2, pathname);
+    char *bname = basename(string2);
 
     // 2 - dirname must exist and is a DIR
     int pino = getino(dname);
+    if (pino == -1)
+    {
+        printf("No parent directory.\n");
+        return -1;
+    }
+
     MINODE *pmip = iget(dev, pino);
     if (S_ISDIR(pmip->INODE.i_mode) == 0)
     {
@@ -106,6 +116,9 @@ int mymkdir(char *pathname)
     }
 
     // 4 - call kmkdir(pmip, basename) to create a DIR;
+    printf("KMKDIR: %s\n", bname);
+    printf("PMIP INO: %d\n", pmip->ino);
+    printf("TIME %lu\n", time(0L));
     kmkdir(pmip, bname);
     ++pmip->INODE.i_links_count;
     pmip->INODE.i_atime = time(0L);
@@ -123,9 +136,6 @@ int kmkdir(MINODE* pmip, char* bname)
     // 2 - create/setup INODE
     MINODE *mip = iget(dev, ino);
     INODE *ip = &mip->INODE;
-    // ip->i_atime = time(0);
-    // ip->i_ctime = time(0);
-    // ip->i_mtime = time(0);
     ip->i_mode = 0x41ED;                                // 040755: DIR type and permissions
     ip->i_uid = running->uid;                           // owner uid
     ip->i_gid = running->gid;                           // group Id
@@ -143,28 +153,35 @@ int kmkdir(MINODE* pmip, char* bname)
     // 3 - Create data block for new DIR containing . and .. entries  
     char buf[BLKSIZE];
     bzero(buf, BLKSIZE);
+    printf("GET BLOCK CALLED\n");
     get_block(dev, blk, buf); // This was not called b4
-    DIR *dp = (DIR *)buf;
+    printf("GET BLOCK CALLED END\n");
+    DIR *mydp = (DIR *)buf;
     char *cp = buf;
 
     // make . entry
-    dp->inode = ino;
-    dp->rec_len = 12;
-    dp->name_len = 1;
-    dp->name[0] = '.';
-    cp += dp->rec_len;
-    dp = (DIR*)cp;
+    printf("Trying to call thingy\n");
+    mydp->inode = ino;
+    mydp->rec_len = 12;
+    mydp->name_len = 1;
+    strcpy(mydp->name, ".");
+    cp += mydp->rec_len;
+    printf("THingy ended.\n");
+    mydp = (DIR*)cp;
 
     // make .. entry: pino=parent DIR ino, blk=allocated block
     // dp = (char *)dp + 12;
-    dp->inode = pmip->ino;       // IN BOOK dp->inode = pino;
-    dp->rec_len = BLKSIZE - 12;  // rec_len spans block
-    dp->name_len = 2;
-    dp->name[0] = '.';
-    dp->name[1] = '.';
+    printf("THingy ended.\n");
+    mydp->inode = pmip->ino;       // IN BOOK dp->inode = pino;
+    mydp->rec_len = BLKSIZE - 12;  // rec_len spans block
+    mydp->name_len = 2;
+    strcpy(mydp->name, "..");
+    printf("PUT BLOCK CALLED\n");
     put_block(dev, blk, buf);
+    printf("PUT BLOCK CALLED END\n");
 
     // enter the child... yikes
+    printf("MAKE CHILD\n");
     enter_child(pmip, ino, bname);
 
     return 0;
@@ -228,68 +245,79 @@ int enter_child(MINODE *pip, int ino, char *name) // kmkdir and creat will both 
     char buf[BLKSIZE];
 
     // set the needed lengh for the new entry name
+    printf("Length of name: %lu\n", strlen(name));
     int need_length = 4 * ((8 + strlen(name) + 3) / 4); // a multiple of 4
+    INODE* ip = &pip->INODE;
 
     for (int i = 0; i < 12; i++)
     {
 
         // if the i_block[i] is 0, break
-        if (pip->INODE.i_block[i] == 0)
+        if (ip->i_block[i] == 0)
             break;
-
+        printf("There.\n");
         // get the data block into buf[ ]
-        get_block(pip->dev, pip->INODE.i_block[i], buf);
+        int blk = ip->i_block[i];
+        get_block(pip->dev, ip->i_block[i], buf);
+        printf("here\n");
 
         // dp points to the last entry in the data block as DIR
-        DIR *dp = (DIR *)buf;
+        DIR *mydp = (DIR *)buf;
 
         // cp points to the last entry in the data block as char
-        char *cp = buf;
+        char* cp = buf;
 
         // traverse the data block to find the last entry
-        while (cp + dp->rec_len < buf + BLKSIZE)
+        printf("Ples\n");
+        printf("%d\n", mydp->rec_len);
+        printf("done.\n");
+        while (cp + mydp->rec_len < buf + BLKSIZE)
         {
-            cp += dp->rec_len;
-            dp = (DIR *)cp;
+            printf("name: %s\n", mydp->name);
+            cp += mydp->rec_len;
+            mydp = (DIR *)cp;
         }
+        printf("End of While loop\n");
 
         // remain is the remaining space in the last entry
-        int ideal_length = 4 * ((8 + dp->name_len + 3) / 4);
-        int remain = dp->rec_len - ideal_length;
+        int ideal_length = 4 * ((8 + mydp->name_len + 3) / 4);
+        int remain = mydp->rec_len - ideal_length;
 
         // if the remaining space is enough to enter the new entry
         if (remain >= need_length)
         {
-            dp->rec_len = ideal_length;
-            cp += dp->rec_len;
-            dp = (DIR *)cp;
-            dp->inode = ino;
+            printf("Entered if\n");
+            mydp->rec_len = ideal_length;
+            cp += mydp->rec_len;
+            mydp = (DIR *)cp;
+            mydp->inode = ino;
 
-            dp->rec_len = remain;
-            dp->name_len = strlen(name);
-            strncpy(dp->name, name, dp->name_len);
-            put_block(pip->dev, pip->INODE.i_block[i], buf);
+            strcpy(mydp->name, name);
+            mydp->rec_len = remain;
+            mydp->name_len = strlen(name);
+            put_block(pip->dev, ip->i_block[i], buf);
             return 0;
         }
         else  // if the remaining space is not enough to enter the new entry
         {
+            printf("Entered else\n");
             // allocate a new data block; increment parent size by BLKSIZE
-            int blk = balloc(pip->dev);
-            pip->INODE.i_size = BLKSIZE;
-            pip->INODE.i_block[i] = blk;
+            blk = balloc(dev);
+            ip->i_size = BLKSIZE;
+            ip->i_block[i] = blk;
             pip->dirty = 1;
 
             get_block(pip->dev, blk, buf);
-            dp = (DIR *)buf;
+            mydp = (DIR *)buf;
             cp = buf;
             // CONFUSED ON THIS STEP
 
             // enter the new entry as the first entry in the new data block with rec_len = BLKSIZE
-            dp->inode = ino;
-            dp->rec_len = BLKSIZE;
-            dp->name_len = strlen(name);
-            strncpy(dp->name, name, dp->name_len);
-            put_block(pip->dev, pip->INODE.i_block[i], buf);
+            mydp->inode = ino;
+            mydp->rec_len = BLKSIZE;
+            mydp->name_len = strlen(name);
+            strcpy(mydp->name, name);
+            put_block(pip->dev, blk, buf);
             return 0;
         }
     }
@@ -319,14 +347,41 @@ int mycreat(char *pathname)
         printf("%s already exists\n", bname);
         return -1;
     }
+    printf("Searched.\n");
 
     // 4 - call kcreat(pmip, basename) to create a FILE;
+    printf("Seggy1\n");
     kcreat(pmip, bname);
+    printf("Seggy2\n");
+    pmip->ref_count++;
+    pmip->dirty = 1;
+    printf("Seggy3\n");
+    iput(pmip);
+    printf("Seggy4\n");
 
     return 0;
 }
 
-int kcreat(MINODE *pmip, int bname)
+void print_inode_stuff(INODE *ip)
+{
+    printf("i_mode: %o\n", ip->i_mode);
+    printf("i_uid: %d\n", ip->i_uid);
+    printf("i_size: %d\n", ip->i_size);
+    printf("i_gid: %d\n", ip->i_gid);
+    printf("i_links_count: %d\n", ip->i_links_count);
+    printf("i_atime: %d\n", ip->i_atime);
+    printf("i_ctime: %d\n", ip->i_ctime);
+    printf("i_mtime: %d\n", ip->i_mtime);
+    printf("i_dtime: %d\n", ip->i_dtime);
+    printf("i_blocks: %d\n", ip->i_blocks);
+    printf("i_block[0]: %d\n", ip->i_block[0]);
+    printf("i_block[1]: %d\n", ip->i_block[1]);
+    printf("i_block[2]: %d\n", ip->i_block[2]);
+    printf("i_block[3]: %d\n", ip->i_block[3]);
+    printf("i_block[4]: %d\n", ip->i_block[4]);
+}
+
+int kcreat(MINODE *pmip, char* bname)
 {
 
     // This is similar to kmkdir() except
@@ -337,11 +392,14 @@ int kcreat(MINODE *pmip, int bname)
     // https://www.theunixschool.com/2012/10/link-count-file-vs-directory.html#:~:text=By%20default%2C%20a%20file%20will,have%20a%20link%20count%201.&text=The%20file%2C%20test.
 
     // 1 - allocate an INODE
+    printf("Allocating an INODE\n");
     int ino = ialloc(dev);
     int blk = balloc(dev);
+    printf("Allocated INODE and block\n");
 
     // 2 - create/setup INODE
     MINODE *mip = iget(dev, ino);
+    printf("Got INODE\n");
     INODE *ip = &mip->INODE;
     ip->i_mode = 0x81A4;                                // 00644: RED file type and permissions = rw-r--r-- = 0x81A4
     ip->i_uid = running->uid;                           // owner uid
@@ -355,11 +413,14 @@ int kcreat(MINODE *pmip, int bname)
         ip->i_block[i] = 0;
     mip->dirty = 1;                                     // mark minode dirty
     iput(mip);                                          // write INODE to disk 
+    printf("Put me in\n");
+    print_inode_stuff(ip);
 
     // 3 - enter the child 
     // TODO: bname should be char* type? Should it be something else?
+    printf("Length of basename: %lu\n", strlen(bname));
     enter_child(pmip, ino, bname);
-
+    printf("FBI Open up.\n");
     return 0;
 }
 
@@ -448,38 +509,15 @@ int rmdir (char *pathname)
         printf("%s is busy\n", pathname);
         return -1;
     }
-
-    if (mip->INODE.i_links_count == 2)
+    // if more than 2 links, then we have something besides `.` and `..`
+    printf("LINKS_COUNT: %d\n", mip->INODE.i_links_count);
+    if (mip->INODE.i_links_count > 2)
     {
-        char buf[BLKSIZE];
-        for (int i = 0; i < 12; ++i)
-        {
-            if (mip->INODE.i_block[i] == 0)
-            {
-                break;
-            }
-            const int dev = mip->dev;
-            const uint block = mip->INODE.i_block[i];
-            get_block(dev, block, buf);
-            DIR* mydp = (DIR*)buf;
-            char* cp = buf;
-            while (cp < buf + BLKSIZE)
-            {
-                strncpy(temp, mydp->name, mydp->name_len);
-                temp[dp->name_len] = '\0';
-                
-                if (strcmp(temp, ".") != 0 && strcmp(temp, "..") != 0)
-                {
-                    return -1;
-                }
-
-                cp += mydp->rec_len;
-                dp = (DIR*)cp;
-            }
-        }
+        printf("Links count greater than two\n");
+        return -1;
     }
 
-    if (mip->INODE.i_mode & 0777 || mip->INODE.i_mode & 0755)
+    if (mip->INODE.i_mode & 040755 == 0)
     {
         printf("Incorrect access permissions: %o\n", mip->INODE.i_mode);
         printf("Expected: %o | %o\n", 0777, 0755);
@@ -516,12 +554,15 @@ int rmdir (char *pathname)
         return -1;
     }
     MINODE *pmip = iget(mip->dev, pino);
-
+    printf("After IGET\n");
     // 4 - get name from parent DIR's data block
-    // findmyname(pmip, ino, bname);
+    findmyname(pmip, ino, bname);
 
     // 5 - remove name from parent directory
-    rm_child(pmip, ino);
+    // Here is SEG FAULT
+    printf("BNAME: %s\n", bname);
+    rm_child(pmip, bname);
+    printf("AFTER RM CHILD\n");
 
     // 6 - dec parent link_count by 1; mark parent pmip dirty;
     pmip->INODE.i_links_count--;
@@ -559,6 +600,7 @@ int rm_child(MINODE *pmip, char *name)
     */
     // WRITE CODE HERE
     DIR* lastdp = NULL;
+    DIR* prevdp = NULL;
     for (int i = 0; i < 12; ++i)
     {
         if (pmip->INODE.i_block[i] == 0)
@@ -566,18 +608,22 @@ int rm_child(MINODE *pmip, char *name)
             break;
         }
         char buf[BLKSIZE];
-        char temp[BLKSIZE >> 2];
+        // char temp[BLKSIZE >> 2];
         get_block(pmip->dev, pmip->INODE.i_block[i], buf);
         DIR* mydp = (DIR*)buf;
         char* cp = buf;
         while (cp < buf + BLKSIZE)
         {
-            strncpy(temp, mydp->name, mydp->name_len);
-            temp[dp->name_len] = '\0';
-            if (strcmp(temp, name) == 0)
+            // strncpy(temp, mydp->name, mydp->name_len);
+            // printf("TEMP: %s\n", temp);
+            printf("NAME: %s\n", name);
+            // temp[mydp->name_len] = '\0';
+            if (strncmp(mydp->name, name, mydp->name_len) == 0)
             {
+                printf("NAME: %s\n", name);
                 if (mydp->rec_len == BLKSIZE)
                 {
+                    printf("FIRST AND ONLY ENTRY\n");
                     if (cp == buf)
                     {
                         bdalloc(pmip->dev, pmip->INODE.i_block[i]);
@@ -595,8 +641,15 @@ int rm_child(MINODE *pmip, char *name)
                         put_block(pmip->dev, pmip->INODE.i_block[i], buf);
                     }
                 }
+                else if (cp + mydp->rec_len >= BLKSIZE + buf)
+                {
+                    printf("I MADE IT :)\n");
+                    prevdp->rec_len += mydp->rec_len; 
+                    put_block(pmip->dev, pmip->INODE.i_block[i], buf);
+                }
                 else
                 {
+                    printf("ELSE STATEMENT\n");
                     DIR* finaldp = (DIR*)buf;
                     char* finalcp = buf;
                     while (finalcp + finaldp->rec_len < buf + BLKSIZE)
@@ -605,7 +658,7 @@ int rm_child(MINODE *pmip, char *name)
                         finaldp = (DIR*)finalcp;
                     }
                     finaldp->rec_len += mydp->rec_len;
-                    memmove(cp, cp + mydp->rec_len, cp + mydp->rec_len - buf + BLKSIZE);
+                    memmove(cp, cp + mydp->rec_len, (buf + BLKSIZE) - (cp + mydp->rec_len));
                     put_block(pmip->dev, pmip->INODE.i_block[i], buf);
                 }
                 pmip->dirty = 1;
@@ -614,7 +667,8 @@ int rm_child(MINODE *pmip, char *name)
             }
             lastdp = mydp;
             cp += mydp->rec_len;
-            dp = (DIR*)cp;
+            prevdp = mydp;
+            mydp = (DIR*)cp;
         }
     }
     return -1;

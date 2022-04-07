@@ -31,12 +31,30 @@ int init()
     mip->mounted = 0;
     mip->mptr = 0;
   }
+  for (i=0; i<NOFT; ++i){
+    oft[i].ref_count = 0;
+    oft[i].offset = 0;
+    oft[i].mode = 0;
+    oft[i].minode_ptr = NULL;
+  }
   for (i=0; i<NPROC; i++){
     p = &proc[i];
     p->pid = i;
-    p->uid = p->gid = 0;
+    p->uid = i;
+    p->status = FREE;
+    p->gid = 0;
     p->cwd = 0;
+    for (j=0; j<NFD; j++)
+      p->fd[j] = 0;
+    p->next = &proc[i+1];
   }
+  for (i=0; i<NMTABLE;++i){
+    mtable[i].dev = mtable[i].ninodes = mtable[i].nblocks = 0;
+    mtable[i].free_blocks = mtable[i].free_inodes = 0;
+    mtable[i].bmap = mtable[i].imap = mtable[i].iblock = 0;
+  }
+  proc[NPROC-1].next = &proc[0];
+  running = &proc[0];
   return 0;
 }
 
@@ -44,7 +62,42 @@ int init()
 int mount_root()
 {  
   printf("mount_root()\n");
+  MTABLE* mp;
+  SUPER * sp;
+  GD    * gp;
+  char buf[BLKSIZE];
+
+  dev = open(disk, O_RDWR);
+  if (dev < 0){
+    printf("open %s failed\n", disk);
+    return -1;
+  }
+  get_block(dev, 1, buf);
+  sp = (SUPER *)buf;
+  if (sp->s_magic != 0xEF53){
+    printf("%s is not an EXT2 FS\n", disk);
+    exit(0);
+  }
+  mp = &mtable[0];
+  mp->dev = dev;
+  ninodes = mp->ninodes = sp->s_inodes_count;
+  nblocks = mp->nblocks = sp->s_blocks_count;
+  strcpy(mp->dev_name, disk);
+  strcpy(mp->mnt_name, "/");
+  get_block(dev, 2, buf);
+  gp = (GD *)buf;
+  bmap = mp->bmap = gp->bg_block_bitmap;
+  imap = mp->imap = gp->bg_inode_bitmap;
+  iblk = mp->iblock = gp->bg_inode_table;
+  printf("ninodes = %d, nblocks = %d\n", ninodes, nblocks);
+  printf("bmap = %d, imap = %d, iblk = %d\n", bmap, imap, iblk);
   root = iget(dev, 2);
+  mp->mnt_dir_ptr = root;
+  root->mounted = mp;
+  for (int i=0; i < NPROC; ++i){
+    proc[i].cwd = iget(dev, 2);
+  }
+  printf("Mount: %s mounted on %s\n", disk, "/");
   return 0;
 }
 
@@ -64,47 +117,16 @@ int main(int argc, char *argv[ ])
 {
   int ino;
   char buf[BLKSIZE];
+  int fd;
 
   printf("checking EXT2 FS ....");
-  if ((fd = open(disk, O_RDWR)) < 0){
-    printf("open %s failed\n", disk);
-    exit(1);
-  }
-
-  dev = fd;    // global dev same as this fd   
-
-  /********** read super block  ****************/
-  get_block(dev, 1, buf);
-  sp = (SUPER *)buf;
-
-  /* verify it's an ext2 file system ***********/
-  if (sp->s_magic != 0xEF53){
-      printf("magic = %x is not an ext2 filesystem\n", sp->s_magic);
-      exit(1);
-  }     
-  printf("EXT2 FS OK\n");
-  ninodes = sp->s_inodes_count;
-  nblocks = sp->s_blocks_count;
-
-  get_block(dev, 2, buf); 
-  gp = (GD *)buf;
-
-  bmap = gp->bg_block_bitmap;
-  imap = gp->bg_inode_bitmap;
-  iblk = gp->bg_inode_table;
-  printf("bmp=%d imap=%d inode_start = %d\n", bmap, imap, iblk);
-
   init();  
   mount_root();
-  printf("root ref_count = %d\n", root->ref_count);
-
-  printf("creating P0 as running process\n");
-  running = &proc[0];
-  running->cwd = iget(dev, 2);
-  printf("root ref_count = %d\n", root->ref_count);
+  printf("EXT2 FS OK\n");
 
   // WRTIE code here to create P1 as a USER process
-  
+  char line[128], cmd[16], pathname[64]; // K.C What are you doing?
+
   while(1){
     printf("input command : [ls|cd|pwd|quit] ");
     fgets(line, 128, stdin);
@@ -129,6 +151,9 @@ int main(int argc, char *argv[ ])
        mymkdir(pathname);
     else if (strcmp(cmd, "rmdir") == 0)
        rmdir(pathname);
+    else if (strcmp(cmd, "creat") == 0)
+       mycreat(pathname);
+    
   }
   return 0;
 }

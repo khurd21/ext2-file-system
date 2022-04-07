@@ -6,8 +6,10 @@
 // Move it somewhere?
 /**** globals defined in main.c file ****/
 extern MINODE minode[NMINODE];
-extern MINODE *root;
+extern MTABLE mtable[NMTABLE];
 extern PROC   proc[NPROC], *running;
+extern OFT    oft[NOFT];
+extern MINODE *root;
 
 extern char gpath[128];
 extern char *name[64];
@@ -21,6 +23,8 @@ extern char line[128], cmd[32], pathname[128];
 int get_block();
 int put_block();
 int tokenize();
+MINODE* mialloc()
+int midealloc(MINODE *);
 MINODE* iget();
 int iput();
 int search();

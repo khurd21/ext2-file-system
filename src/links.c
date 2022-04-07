@@ -142,17 +142,50 @@ int symlink(char *pathname)
         iput(new_file's minode);
     5 - mark new_file parent minode dirty;
     6 - iput(new_file's parent minode);
-
     */
 
     // 1 - split pathname with old_file and new_file
     char old_file[128], new_file[128];
     char *s = strtok(pathname, " ");
     strcpy(old_file, s);
-    s = strtok(0, " ");
+    s = strtok(NULL, " ");
     strcpy(new_file, s);
+    printf("old_file: %s\n", old_file);
+    printf("new_file: %s\n", new_file);
 
-    // WRITE CODE HERE
+    // 2 - old_file must exist and new_file must not exist yet:
+    dev = old_file[0] == '/' ? root->dev : running->cwd->dev;
+    int oino = getino(old_file);
+    if (oino == -1)
+    {
+        printf("symlink: old_file does not exist.\n");
+        return -1;
+    }
+
+    dev = new_file[0] == '/' ? root->dev : running->cwd->dev;
+    // 3 - creat new_file; change new_file to LNK (symbolic link) type;
+    int res = mycreat(new_file);
+    if (res == -1)
+    {
+        printf("symlink: mycreat failed.\n");
+        return -1;
+    }
+
+    int nino = getino(new_file);
+    if (nino == -1)
+    {
+        printf("symlink: new_file already exists.\n");
+        return -1;
+    }
+
+    MINODE *mip = iget(dev, nino);
+    mip->INODE.i_mode = 0120777;
+    // store old_file name in new_file's INODE.i_block[ ] area.
+    strncpy(mip->INODE.i_block, old_file, 60);
+    mip->INODE.i_size = strlen(old_file) + 1;
+    mip->dirty = 1;
+    iput(mip);
+    return 0;
 }
 
 int readlink(char *file, char *buf)

@@ -20,8 +20,10 @@ DIR   *dp;
 
 #define BLKSIZE  1024
 #define NMINODE   128
+#define NMTABLE     8
 #define NFD        10
 #define NPROC       2
+#define NOFT       40
 
 typedef struct minode{
   INODE INODE;           // INODE structure on disk
@@ -45,6 +47,7 @@ typedef struct proc{
   int          pid;      // process ID  
   int          uid;      // user ID
   int          gid;
+  int          status;   // FREE or READY
   MINODE      *cwd;      // CWD directory pointer  
   OFT         *fd[NFD];
 }PROC;
@@ -59,9 +62,9 @@ typedef struct mtable {
   int bmap;             // from group descriptor
   int imap;
   int iblock;           // inodes start block
-  MINODE *mntDirPtr;    // mount point DIR pointer
-  char devName[64];     // device name
-  char mntName[64];     // mount point DIR name
+  MINODE *mnt_dir_ptr;    // mount point DIR pointer
+  char dev_name[64];     // device name
+  char mnt_name[64];     // mount point DIR name
 } MTABLE;
 
 #endif
