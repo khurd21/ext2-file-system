@@ -101,6 +101,13 @@ int mymkdir(char *pathname)
         return -1;
     }
 
+    // check if bname is "/"
+    if (strcmp(bname, "/") == 0)
+    {
+        printf("Cannot create directory with name \"/\".\n");
+        return -1;
+    }
+
     MINODE *pmip = iget(dev, pino);
     if (S_ISDIR(pmip->INODE.i_mode) == 0)
     {
@@ -116,9 +123,6 @@ int mymkdir(char *pathname)
     }
 
     // 4 - call kmkdir(pmip, basename) to create a DIR;
-    printf("KMKDIR: %s\n", bname);
-    printf("PMIP INO: %d\n", pmip->ino);
-    printf("TIME %lu\n", time(0L));
     kmkdir(pmip, bname);
     ++pmip->INODE.i_links_count;
     pmip->INODE.i_atime = time(0L);
@@ -153,35 +157,27 @@ int kmkdir(MINODE* pmip, char* bname)
     // 3 - Create data block for new DIR containing . and .. entries  
     char buf[BLKSIZE];
     bzero(buf, BLKSIZE);
-    printf("GET BLOCK CALLED\n");
     get_block(dev, blk, buf); // This was not called b4
-    printf("GET BLOCK CALLED END\n");
     DIR *mydp = (DIR *)buf;
     char *cp = buf;
 
     // make . entry
-    printf("Trying to call thingy\n");
     mydp->inode = ino;
     mydp->rec_len = 12;
     mydp->name_len = 1;
     strcpy(mydp->name, ".");
     cp += mydp->rec_len;
-    printf("THingy ended.\n");
     mydp = (DIR*)cp;
 
     // make .. entry: pino=parent DIR ino, blk=allocated block
     // dp = (char *)dp + 12;
-    printf("THingy ended.\n");
     mydp->inode = pmip->ino;       // IN BOOK dp->inode = pino;
     mydp->rec_len = BLKSIZE - 12;  // rec_len spans block
     mydp->name_len = 2;
     strcpy(mydp->name, "..");
-    printf("PUT BLOCK CALLED\n");
     put_block(dev, blk, buf);
-    printf("PUT BLOCK CALLED END\n");
 
     // enter the child... yikes
-    printf("MAKE CHILD\n");
     enter_child(pmip, ino, bname);
 
     return 0;
@@ -245,7 +241,6 @@ int enter_child(MINODE *pip, int ino, char *name) // kmkdir and creat will both 
     char buf[BLKSIZE];
 
     // set the needed lengh for the new entry name
-    printf("Length of name: %lu\n", strlen(name));
     int need_length = 4 * ((8 + strlen(name) + 3) / 4); // a multiple of 4
     INODE* ip = &pip->INODE;
 
@@ -255,11 +250,9 @@ int enter_child(MINODE *pip, int ino, char *name) // kmkdir and creat will both 
         // if the i_block[i] is 0, break
         if (ip->i_block[i] == 0)
             break;
-        printf("There.\n");
         // get the data block into buf[ ]
         int blk = ip->i_block[i];
         get_block(pip->dev, ip->i_block[i], buf);
-        printf("here\n");
 
         // dp points to the last entry in the data block as DIR
         DIR *mydp = (DIR *)buf;
@@ -268,16 +261,12 @@ int enter_child(MINODE *pip, int ino, char *name) // kmkdir and creat will both 
         char* cp = buf;
 
         // traverse the data block to find the last entry
-        printf("Ples\n");
         printf("%d\n", mydp->rec_len);
-        printf("done.\n");
         while (cp + mydp->rec_len < buf + BLKSIZE)
         {
-            printf("name: %s\n", mydp->name);
             cp += mydp->rec_len;
             mydp = (DIR *)cp;
         }
-        printf("End of While loop\n");
 
         // remain is the remaining space in the last entry
         int ideal_length = 4 * ((8 + mydp->name_len + 3) / 4);
@@ -286,7 +275,6 @@ int enter_child(MINODE *pip, int ino, char *name) // kmkdir and creat will both 
         // if the remaining space is enough to enter the new entry
         if (remain >= need_length)
         {
-            printf("Entered if\n");
             mydp->rec_len = ideal_length;
             cp += mydp->rec_len;
             mydp = (DIR *)cp;
@@ -296,11 +284,11 @@ int enter_child(MINODE *pip, int ino, char *name) // kmkdir and creat will both 
             mydp->rec_len = remain;
             mydp->name_len = strlen(name);
             put_block(pip->dev, ip->i_block[i], buf);
+            printf("successfully created %s\n", name);
             return 0;
         }
         else  // if the remaining space is not enough to enter the new entry
         {
-            printf("Entered else\n");
             // allocate a new data block; increment parent size by BLKSIZE
             blk = balloc(dev);
             ip->i_size = BLKSIZE;
@@ -318,6 +306,7 @@ int enter_child(MINODE *pip, int ino, char *name) // kmkdir and creat will both 
             mydp->name_len = strlen(name);
             strcpy(mydp->name, name);
             put_block(pip->dev, blk, buf);
+             printf("succesfully created %s\n", name);
             return 0;
         }
     }
@@ -347,17 +336,12 @@ int mycreat(char *pathname)
         printf("%s already exists\n", bname);
         return -1;
     }
-    printf("Searched.\n");
 
     // 4 - call kcreat(pmip, basename) to create a FILE;
-    printf("Seggy1\n");
     kcreat(pmip, bname);
-    printf("Seggy2\n");
     pmip->ref_count++;
     pmip->dirty = 1;
-    printf("Seggy3\n");
     iput(pmip);
-    printf("Seggy4\n");
 
     return 0;
 }
@@ -392,14 +376,11 @@ int kcreat(MINODE *pmip, char* bname)
     // https://www.theunixschool.com/2012/10/link-count-file-vs-directory.html#:~:text=By%20default%2C%20a%20file%20will,have%20a%20link%20count%201.&text=The%20file%2C%20test.
 
     // 1 - allocate an INODE
-    printf("Allocating an INODE\n");
     int ino = ialloc(dev);
     int blk = balloc(dev);
-    printf("Allocated INODE and block\n");
 
     // 2 - create/setup INODE
     MINODE *mip = iget(dev, ino);
-    printf("Got INODE\n");
     INODE *ip = &mip->INODE;
     ip->i_mode = 0x81A4;                                // 00644: RED file type and permissions = rw-r--r-- = 0x81A4
     ip->i_uid = running->uid;                           // owner uid
@@ -413,14 +394,12 @@ int kcreat(MINODE *pmip, char* bname)
         ip->i_block[i] = 0;
     mip->dirty = 1;                                     // mark minode dirty
     iput(mip);                                          // write INODE to disk 
-    printf("Put me in\n");
-    print_inode_stuff(ip);
+
+    // print_inode_stuff(ip); will probably use for state
 
     // 3 - enter the child 
     // TODO: bname should be char* type? Should it be something else?
-    printf("Length of basename: %lu\n", strlen(bname));
     enter_child(pmip, ino, bname);
-    printf("FBI Open up.\n");
     return 0;
 }
 
@@ -510,7 +489,6 @@ int rmdir (char *pathname)
         return -1;
     }
     // if more than 2 links, then we have something besides `.` and `..`
-    printf("LINKS_COUNT: %d\n", mip->INODE.i_links_count);
     if (mip->INODE.i_links_count > 2)
     {
         printf("Links count greater than two\n");
@@ -554,15 +532,13 @@ int rmdir (char *pathname)
         return -1;
     }
     MINODE *pmip = iget(mip->dev, pino);
-    printf("After IGET\n");
+
     // 4 - get name from parent DIR's data block
     findmyname(pmip, ino, bname);
 
     // 5 - remove name from parent directory
     // Here is SEG FAULT
-    printf("BNAME: %s\n", bname);
     rm_child(pmip, bname);
-    printf("AFTER RM CHILD\n");
 
     // 6 - dec parent link_count by 1; mark parent pmip dirty;
     pmip->INODE.i_links_count--;
@@ -616,14 +592,11 @@ int rm_child(MINODE *pmip, char *name)
         {
             // strncpy(temp, mydp->name, mydp->name_len);
             // printf("TEMP: %s\n", temp);
-            printf("NAME: %s\n", name);
             // temp[mydp->name_len] = '\0';
             if (strncmp(mydp->name, name, mydp->name_len) == 0)
             {
-                printf("NAME: %s\n", name);
                 if (mydp->rec_len == BLKSIZE)
                 {
-                    printf("FIRST AND ONLY ENTRY\n");
                     if (cp == buf)
                     {
                         bdalloc(pmip->dev, pmip->INODE.i_block[i]);
@@ -643,13 +616,11 @@ int rm_child(MINODE *pmip, char *name)
                 }
                 else if (cp + mydp->rec_len >= BLKSIZE + buf)
                 {
-                    printf("I MADE IT :)\n");
                     prevdp->rec_len += mydp->rec_len; 
                     put_block(pmip->dev, pmip->INODE.i_block[i], buf);
                 }
                 else
                 {
-                    printf("ELSE STATEMENT\n");
                     DIR* finaldp = (DIR*)buf;
                     char* finalcp = buf;
                     while (finalcp + finaldp->rec_len < buf + BLKSIZE)
@@ -663,6 +634,7 @@ int rm_child(MINODE *pmip, char *name)
                 }
                 pmip->dirty = 1;
                 iput(pmip);
+                printf("successfully deleted %s\n", name);
                 return 0;
             }
             lastdp = mydp;

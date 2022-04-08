@@ -246,7 +246,7 @@ int getino(char *pathname)
   for (i=0; i<nname; i++) {
      if (S_ISDIR(mip->INODE.i_mode == 0))
      {
-        printf("%s is not a directory.\n");
+        printf("%s is not a directory.\n", name[i]);
         iput(mip);
         return 0;
      }

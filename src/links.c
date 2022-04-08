@@ -9,15 +9,13 @@
 #include "type.h"
 #include "util.h"
 
-int link(char *pathname) // or ln
+int link(char *pathname, char* pathname2) // or ln
 {
-    // split pathname with old_file and new_file
-    char old_file[128], new_file[128];
-    char *s = strtok(pathname, " ");
-    strcpy(old_file, s);
-    s = strtok(0, " ");
-    strcpy(new_file, s);
+    // intialize old_file to pathname and new_file to pathname2
+    char *old_file = pathname;
+    char *new_file = pathname2;
 
+    printf("old_file: %s and new_file: %s\n", old_file, new_file);
     // 1 - verify old_file exists and is not a DIR
     int oino = getino(old_file);
     MINODE *omip = iget(dev, oino);
@@ -28,7 +26,7 @@ int link(char *pathname) // or ln
     }
 
     // 2 - new_file must not exist yet:
-    if (getino(new_file) != 0)
+    if (getino(new_file) != -1)
     {
         printf("link: new_file already exists.\n");
         return -1;
@@ -88,7 +86,7 @@ int unlink(char *pathname)
     // remove name entry from parent DIR's data block
     int pino = getino(parent);
     MINODE *pmip = iget(dev, pino);
-    rm_child(pmip, ino, child);
+    rm_child(pmip, child);
     pmip->dirty = 1;
     iput(pmip);
 
@@ -127,7 +125,7 @@ int inode_truncate(MINODE *pmip)
     }
 }
 
-int symlink(char *pathname)
+int symlink(char *pathname, char *pathname2)
 {
     /*
 
@@ -145,13 +143,10 @@ int symlink(char *pathname)
     */
 
     // 1 - split pathname with old_file and new_file
-    char old_file[128], new_file[128];
-    char *s = strtok(pathname, " ");
-    strcpy(old_file, s);
-    s = strtok(NULL, " ");
-    strcpy(new_file, s);
-    printf("old_file: %s\n", old_file);
-    printf("new_file: %s\n", new_file);
+    char *old_file = pathname;
+    char *new_file = pathname2;
+
+    printf("old_file: %s and new_file: %s\n", old_file, new_file);
 
     // 2 - old_file must exist and new_file must not exist yet:
     dev = old_file[0] == '/' ? root->dev : running->cwd->dev;
@@ -202,6 +197,7 @@ int readlink(char *file, char *buf)
     int ino = getino(file);
     MINODE *mip = iget(dev, ino);
 
+    printf("mip->INODE.i_mode: %d\n", mip->INODE.i_mode);
     if (!S_ISLNK(mip->INODE.i_mode))
     {
         printf("readlink: file is not a symbolic link.\n");
@@ -210,12 +206,12 @@ int readlink(char *file, char *buf)
 
     // 2 - copy link's content to buf
     // do we need to load all?
-    for (int i = 0; mip->INODE.i_blocks; ++i)
-    {
-        strcpy(buf, mip->INODE.i_block[0]);
-    }
+    printf("before strcpy\n");
 
+    strcpy(buf, (char *)mip->INODE.i_block);
+
+    printf("readlink buf content: %s\n", buf);
+    printf("readlink: file size: %d\n", mip->INODE.i_size);
     // 3 - return file size
     return mip->INODE.i_size;
-
 }

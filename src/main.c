@@ -93,12 +93,18 @@ int mount_root()
   printf("bmap = %d, imap = %d, iblk = %d\n", bmap, imap, iblk);
   root = iget(dev, 2);
   mp->mnt_dir_ptr = root;
-  root->mounted = mp;
+  root->mptr = mp;
   for (int i=0; i < NPROC; ++i){
     proc[i].cwd = iget(dev, 2);
   }
   printf("Mount: %s mounted on %s\n", disk, "/");
   return 0;
+}
+
+int menu() // can get rid of this if you want
+{
+  printf("All Commands:\n");
+  printf("[ls|cd|pwd|mkdir|rmdir|creat|link|unlink|symlink|readlink|stat|chmod|utime|quit]\n\n");
 }
 
 int quit()
@@ -125,35 +131,51 @@ int main(int argc, char *argv[ ])
   printf("EXT2 FS OK\n");
 
   // WRTIE code here to create P1 as a USER process
-  char line[128], cmd[16], pathname[64]; // K.C What are you doing?
+  char line[128], cmd[16], pathname[64], pathname2[64]; // K.C What are you doing?
 
   while(1){
-    printf("input command : [ls|cd|pwd|quit] ");
+    printf("input command [enter \"menu\" to view all commands]: "); 
     fgets(line, 128, stdin);
     line[strlen(line)-1] = 0;
 
     if (line[0]==0)
        continue;
     pathname[0] = 0;
+    pathname2[0] = 0;
 
-    sscanf(line, "%s %s", cmd, pathname);
-    printf("cmd=%s pathname=%s\n", cmd, pathname);
+    sscanf(line, "%s %s %s", cmd, pathname, pathname2); // PATHNAME2 is for link, symlink, and chmod
+    printf("cmd=%s, pathname=%s, pathname2=%s\n", cmd, pathname, pathname2);
   
     if (strcmp(cmd, "ls")==0)
-       ls(pathname);
+      ls(pathname);
     else if (strcmp(cmd, "cd")==0)
-       cd(pathname);
+      cd(pathname);
     else if (strcmp(cmd, "pwd")==0)
-       pwd(running->cwd);
+      pwd(running->cwd);
     else if (strcmp(cmd, "quit")==0)
-       quit();
+      quit();
     else if (strcmp(cmd, "mkdir") == 0)
-       mymkdir(pathname);
+      mymkdir(pathname);
     else if (strcmp(cmd, "rmdir") == 0)
-       rmdir(pathname);
+      rmdir(pathname);
     else if (strcmp(cmd, "creat") == 0)
-       mycreat(pathname);
-    
+      mycreat(pathname);
+    else if (strcmp(cmd, "link") == 0)
+      link(pathname, pathname2);
+    else if (strcmp(cmd, "unlink") == 0)
+      unlink(pathname);
+    else if (strcmp(cmd, "symlink") == 0)
+      symlink(pathname, pathname2);
+    else if (strcmp(cmd, "readlink") == 0)
+      readlink(pathname, buf); // ASSUMED THE BUF IS DEFINED IN MAIN FUNCTION AS IT IS ABOVE
+    else if (strcmp(cmd, "stat") == 0)
+      mystat(pathname);
+    else if (strcmp(cmd, "chmod") == 0)
+      mychmod(atoi(pathname), pathname2);
+    else if (strcmp(cmd, "utime") == 0)
+      utime(pathname);
+    else if (strcmp(cmd, "menu") == 0)
+      menu();
   }
   return 0;
 }

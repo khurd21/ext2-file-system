@@ -30,9 +30,8 @@ typedef struct minode{
   int dev, ino;          // (dev, ino) of INODE
   int ref_count;          // in use count
   int dirty;             // 0 for clean, 1 for modified
-
-  int mounted;           // for level-3
-  struct mntable *mptr;  // for level-3
+  int mounted;           // for level-3 mounted flag
+  struct mntable *mptr;  // for level-3 mount table pointer
 }MINODE;
 
 typedef struct oft{
