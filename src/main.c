@@ -170,8 +170,11 @@ int main(int argc, char *argv[ ])
       readlink(pathname, buf); // ASSUMED THE BUF IS DEFINED IN MAIN FUNCTION AS IT IS ABOVE
     else if (strcmp(cmd, "stat") == 0)
       mystat(pathname);
-    else if (strcmp(cmd, "chmod") == 0)
-      mychmod(atoi(pathname), pathname2);
+    else if (strcmp(cmd, "chmod") == 0) // Bug here, need to convert an octal string to an integer
+    {
+      char* ptr;
+      mychmod(strtol(pathname, &ptr, 8), pathname2);
+    }
     else if (strcmp(cmd, "utime") == 0)
       utime(pathname);
     else if (strcmp(cmd, "menu") == 0)

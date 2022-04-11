@@ -53,18 +53,19 @@ int mystat(char* pathname)
     mymtime[strlen(mymtime) - 1] = '\0';
     myctime[strlen(myctime) - 1] = '\0';
 
+    // Try to mimic unix `stat -x ...`
     printf("MYSTAT INFOMATION:\n");
-    printf("FILE:   %s\n", filename);
-    printf("INODE:  %d\n", ino);
-    printf("MODE:   %o/0x%x\n", mip->INODE.i_mode, mip->INODE.i_mode);
-    printf("LINKS:  %d\n", mip->INODE.i_links_count);
-    printf("UID:    %d\n", mip->INODE.i_uid);
-    printf("GID:    %d\n", mip->INODE.i_gid);
-    printf("SIZE:   %d\n", mip->INODE.i_size);
-    printf("BLOCKS: %d\n", mip->INODE.i_blocks);
-    printf("MTIME:  %s\n", mymtime);
-    printf("CTIME:  %s\n", myctime);
-    printf("ATIME:  %s\n", myatime);
+    printf("  File: \"%s\"\n", filename);
+    printf("  Size: %d\n", mip->INODE.i_size);
+    printf("  Mode: %o/0x%x", mip->INODE.i_mode, mip->INODE.i_mode);
+    printf("\tUid: %d", mip->INODE.i_uid);
+    printf("\tGid: %d\n", mip->INODE.i_gid);
+    printf(" Links: %d", mip->INODE.i_links_count);
+    printf("\tInode: %d\n", ino);
+    printf("Blocks: %d\n", mip->INODE.i_blocks);
+    printf("Access: %s\n", myatime);
+    printf("Modify: %s\n", mymtime);
+    printf("Change: %s\n", myctime);
 
     // 4 - iput(mip);
     iput(mip);

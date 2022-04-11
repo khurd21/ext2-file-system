@@ -57,8 +57,23 @@ int link(char *pathname, char* pathname2) // or ln
 
 int unlink(char *pathname)
 {
+    // 0 - like others, we need to check if path is `/` or `./`
+    if (pathname[0] == '/')
+    {
+        dev = root->dev;
+    }
+    else
+    {
+        dev = running->cwd->dev;
+    }
+
     // 1 - get filename's minode
     int ino = getino(pathname);
+    if (ino < 0)
+    {
+        printf("unlink: file does not exist.\n");
+        return -1;
+    }
     MINODE *mip = iget(dev, ino);
 
     // check it's a REG or symbolic LNK file; can not be a DIR
@@ -67,46 +82,49 @@ int unlink(char *pathname)
         printf("unlink: cannot unlink a directory.\n");
         return -1;
     }
-
+    /*
+    Do we want to not unlink hard links?
+    Condition here prevents this.
     if (!S_ISLNK(mip->INODE.i_mode))
     {
         printf("unlink: cannot unlink a symbolic link.\n");
         return -1;
     }
+    */
 
     // 2 - remove name entry from paren DIR's data block:
 
     // get parent and child's name from pathname
-    char temp[128];
-    strcpy(temp, pathname);
-    char *parent = dirname(temp);
-    strcpy(temp, pathname);
-    char *child = basename(temp);
-
-    // remove name entry from parent DIR's data block
-    int pino = getino(parent);
-    MINODE *pmip = iget(dev, pino);
-    rm_child(pmip, child);
-    pmip->dirty = 1;
-    iput(pmip);
+    // same issue for others. Can we verify temp is in a different address?
+    // We are probably accessing same memory here.
+    char child[128];
+    char parent[128];
+    strcpy(parent, dirname(pathname));
+    strcpy(child, basename(pathname));
 
     // 3 - decrement INODE's link_count by 1
     mip->INODE.i_links_count--;
 
-    // 4 - if INODE's link_count is 0, remove INODE from disk
-    if (mip->INODE.i_links_count > 0)
+    // 4 - if INODE's link_count is 0, then delete INODE from disk
+    if (mip->INODE.i_links_count == 0 && S_ISLNK(mip->INODE.i_mode) == 0)
     {
-        mip->dirty = 1; // for write INODE back to disk
+        // if link count is 0, and it's a symbolic link,
+        // we need to free the data block of the symbolic link
+        // and then free the INODE
+        // we can use truncate() to do this
+        inode_truncate(mip);
     }
-    else
+    mip->dirty = 1;
+    iput(mip);
+
+    int pino = getino(parent);
+    if (pino < 0)
     {
-        // deallocate all data blocks in INODE;
-        // deallocate INODE;
-        inode_truncate(pmip); // could be mip instead
+        printf("unlink: parent does not exist.\n");
+        return -1;
     }
-
-    iput(mip); // release mip
-
+    MINODE *pmip = iget(dev, pino);
+    rm_child(pmip, child);
     return 0;
 }
 
