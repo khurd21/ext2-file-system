@@ -104,7 +104,8 @@ int mount_root()
 int menu() // can get rid of this if you want
 {
   printf("All Commands:\n");
-  printf("[ls|cd|pwd|mkdir|rmdir|creat|link|unlink|symlink|readlink|stat|chmod|utime|quit]\n\n");
+  printf("[ls|cd|pwd|mkdir|rmdir|creat|link|unlink|symlink|readlink|stat|chmod|utime\n");
+  printf(" open|close|lseek|pfd|quit]\n");
 }
 
 int quit()
@@ -177,6 +178,18 @@ int main(int argc, char *argv[ ])
     }
     else if (strcmp(cmd, "utime") == 0)
       utime(pathname);
+    else if (strcmp(cmd, "open") == 0)
+      myopen(pathname, atoi(pathname2));
+    else if (strcmp(cmd, "close") == 0)
+      myclose(atoi(pathname));
+    else if (strcmp(cmd, "lseek") == 0)
+      mylseek(atoi(pathname), atoi(pathname2));
+    else if (strcmp(cmd, "dup") == 0)
+      dup(atoi(pathname));
+    else if (strcmp(cmd, "dup2") == 0)
+      dup2(atoi(pathname), atoi(pathname2));
+    else if (strcmp(cmd, "pfd") == 0)
+      pfd();
     else if (strcmp(cmd, "menu") == 0)
       menu();
   }

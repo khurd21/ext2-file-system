@@ -128,21 +128,6 @@ int unlink(char *pathname)
     return 0;
 }
 
-int inode_truncate(MINODE *pmip)
-{
-    // THIS FUNCTION WILL HAVE TO HAVE CHANAGES TO IT TO COUNT FOR INDIRECT BLOCKS
-    // IN LEVEL 2 AS THIS ONLY COUNTS FOR 12 DIRECT BLOCKS
-    int i;
-    INODE *ip = &pmip->INODE;
-    for (i = 0; i < 12; i++)
-    {
-        if (ip->i_block[i] == 0)
-            continue;
-        bdalloc(dev, ip->i_block[i]);
-        ip->i_block[i] = 0;
-    }
-}
-
 int symlink(char *pathname, char *pathname2)
 {
     /*

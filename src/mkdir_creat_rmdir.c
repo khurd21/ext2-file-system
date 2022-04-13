@@ -324,6 +324,12 @@ int mycreat(char *pathname)
     // 2 - dirname must exist and is a DIR
     int pino = getino(dname);
     MINODE *pmip = iget(dev, pino);
+    if (pino == -1)
+    {
+        printf("%s does not exist\n", dname);
+        return -1;
+    }
+    
     if (S_ISDIR(pmip->INODE.i_mode) == 0)
     {
         printf("%s is not a directory\n", dname);

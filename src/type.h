@@ -25,6 +25,11 @@ DIR   *dp;
 #define NPROC       2
 #define NOFT       40
 
+#define READ        0
+#define WRITE       1
+#define READ_WRITE  2
+#define APPEND      3
+
 typedef struct minode{
   INODE INODE;           // INODE structure on disk
   int dev, ino;          // (dev, ino) of INODE

@@ -34,7 +34,6 @@ int rm_child(MINODE *pmip, char *name);
 
 int link(char *old_file, char *new_file);
 int unlink(char *pathname);
-int inode_truncate(MINODE *pmip);
 int symlink(char *old_file, char *new_file);
 int readlink(char *file, char *buf);
 
@@ -43,5 +42,21 @@ int readlink(char *file, char *buf);
 int mystat(char *pathname);
 int mychmod(int mode, char *pathname);
 int utime(char *pathname);
+
+/**** open_close.c ****/
+
+int myopen(char *pathname, int mode);
+int inode_truncate(MINODE *pmip);
+int myclose(int fd);
+int mylseek(int fd, int position);
+int pfd();
+int dup(int fd);
+int dup2(int fd, int gd);
+
+/**** read_write.c ****/
+
+int myread(int fd, char *buf, int nbytes);
+int mywrite(int fd, char buf[], int nbytes);
+int map(MINODE *mip, int lbk);
 
 #endif
