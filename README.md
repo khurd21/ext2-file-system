@@ -1,7 +1,6 @@
-# Cpts360-Final-Project
+# CPT_S 360 Final Project Copy&Submit
+Student: Kyle Hurd   
+Student: AbdulAziz Al-Dalaan
 
-Lab 6 Link: https://eecs.wsu.edu/~cs360/mountroot.html
-
-Project Specification: https://eecs.wsu.edu/~cs360/proj22.html
-
-HOW TO MKDIR AND CREAT: https://eecs.wsu.edu/~cs360/mkdir_creat.html
+## How to Run:
+In order to run program, run `./mkdisk.sh` then `./mk.sh`
