@@ -188,6 +188,22 @@ int main(int argc, char *argv[ ])
       dup(atoi(pathname));
     else if (strcmp(cmd, "dup2") == 0)
       dup2(atoi(pathname), atoi(pathname2));
+    else if (strcmp(cmd, "read") == 0)
+    {
+      char rbuf[BLKSIZE];
+      myread(atoi(pathname), atoi(pathname2), rbuf); // NEED A VAR TO RETURN TO
+    }
+    else if (strcmp(cmd, "write") == 0)
+    {
+      char wbuf[BLKSIZE];
+      mywrite(atoi(pathname), atoi(pathname2), wbuf); // MEED A VAR TO RETURN TO
+    }
+    else if (strcmp(cmd, "cat") == 0)
+      cat(pathname);
+    else if (strcmp(cmd, "cp") == 0)
+      cp(pathname, pathname2);
+    else if (strcmp(cmd, "mv") == 0)
+      mv(pathname, pathname2);
     else if (strcmp(cmd, "pfd") == 0)
       pfd();
     else if (strcmp(cmd, "menu") == 0)

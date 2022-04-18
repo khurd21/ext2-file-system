@@ -10,9 +10,23 @@
 #include "type.h"
 #include "util.h"
 
-int myread(int fd, char* buf, int nbytes)
+int myread(int fd, int nbytes,  char* buf)
 {
-    char readbuf[BLKSIZE];
+    // checks if the fd is valid
+    if (fd < 0 || fd >= NFD || running->fd[fd] == NULL)
+    {
+        printf("myread: fd is invalid\n");
+        return -1;
+    }
+
+    // checks if the file is open for READ
+    if (running->fd[fd]->mode == READ || running->fd[fd] == READ_WRITE)
+    {
+        printf("myread: fd is not open for read\n");
+        return -1;
+    }
+
+    char read_buf[BLKSIZE];
     int count = 0, blk = 0, remain = 0;
     // offset is set to byte set in file to read
     OFT *oftp = running->fd[fd];
@@ -42,10 +56,10 @@ int myread(int fd, char* buf, int nbytes)
         }
 
         // get the data block into readbuf[BLKSIZE]
-        get_block(oftp->minode_ptr->dev, blk, readbuf);
+        get_block(oftp->minode_ptr->dev, blk, read_buf);
 
         // copy from startByte to buf[ ], at most remain bytes in this block
-        char *cp = readbuf + startByte;
+        char *cp = read_buf + startByte;
         remain = BLKSIZE - startByte;
 
         while(remain > 0)
@@ -65,9 +79,23 @@ int myread(int fd, char* buf, int nbytes)
     return count;
 }
 
-int mywrite(int fd, char buf[], int nbytes)
+int mywrite(int fd, int nbytes, char *buf)
 {
-    char wbuf[BLKSIZE];
+    // checks if the fd is valid
+    if (fd < 0 || fd >= NFD || running->fd[fd] == NULL)
+    {
+        printf("myread: fd is invalid\n");
+        return -1;
+    }
+
+    // checks if the file is open for WRITE
+    if (running->fd[fd]->mode == WRITE || running->fd[fd] == READ_WRITE)
+    {
+        printf("myread: fd is not open for write\n");
+        return -1;
+    }
+
+    char write_buf[BLKSIZE];
     char *cq = buf;
     int blk = 0, count = 0, remain = 0;
     OFT *oftp = running->fd[fd];
@@ -112,9 +140,9 @@ int mywrite(int fd, char buf[], int nbytes)
         }
         // for all cases come here to write to the data block
 
-        get_block(mip->dev, blk, wbuf);
+        get_block(mip->dev, blk, write_buf);
         // copy from startByte to buf[ ], at most remain bytes in this block
-        char *cp = wbuf + startByte;
+        char *cp = write_buf + startByte;
         remain = BLKSIZE - startByte;
 
         while(remain > 0)
@@ -124,7 +152,7 @@ int mywrite(int fd, char buf[], int nbytes)
             count++;
             oftp->offset++;   
         }
-        put_block(mip->dev, blk, wbuf);
+        put_block(mip->dev, blk, write_buf);
         // loop back to outer while to write more ... until nbytes are written.
     }
 

@@ -55,8 +55,14 @@ int dup2(int fd, int gd);
 
 /**** read_write.c ****/
 
-int myread(int fd, char *buf, int nbytes);
-int mywrite(int fd, char buf[], int nbytes);
+int myread(int fd, int nbytes, char *buf);
+int mywrite(int fd, int nbytes, char *buf);
 int map(MINODE *mip, int lbk);
+
+/**** cat_cp_mv.c ****/
+
+int cat(char *pathname);
+int cp(char *src_file, char *dest_file);
+int mv(char *src_file, char *dest_file);
 
 #endif
