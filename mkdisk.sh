@@ -1,6 +1,7 @@
 #! /bin/sh
 # mkdisk: create a virtual disk diskimage
 
+mkdir -p images
 cd ./images
 sudo dd if=/dev/zero of=diskimage bs=1024 count=1440
 sudo mke2fs -b 1024 diskimage 1440
