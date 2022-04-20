@@ -24,10 +24,12 @@ int cat(char *pathname)
 
     while ((n = myread(fd, BLKSIZE, mybuf)))
     {
-        mybuf[n] = 0;
-        printf("%s", mybuf); // THIS works but it is not good
-        // must spit out chars from mybuf[ ] \n properly;
-        
+        // must spit out chars from mybuf[ ] \n properly; ??
+        char *cp = mybuf; // check char by char for NULL or \n
+        while (*cp)
+        {
+            putchar(*cp++);
+        }
     }
     return 0;
 }
@@ -63,6 +65,7 @@ int cp(char *src_file, char *dest_file)
     while (n = myread(fd, BLKSIZE, buf))
     {
         mywrite(gd, n, buf);
+        memset(buf, 0, BLKSIZE);
         total_bytes += n;
     }
 
@@ -87,8 +90,26 @@ Algorithm for mv:
 3. cp src to dst
 4. unlink src
 */
-int mv(char *src_file, char *dest_file)
+int mv(char *src_file, char *dest_file) // NOT FINISHED
 {
     // THIS IS A MINOR FUNCTION LEAVE IT TILL LATER
+    // 1. verify src exists; get its INODE in ==> you already know its dev
+    int ino = getino(src_file);
+    if (ino < 0)
+    {
+        printf("mv: cannot find %s\n", src_file);
+        return -1;
+    }
+    // 2. check whether src is on the same dev as src
+    // ???
+
+    // 3. Hard link dst with src (i.e. same INODE number)
+    symlink(dest_file, src_file);
+    // OR
+    // cp src to dst
+    cp(src_file, dest_file);
+
+    // 4. unlink src (i.e. rm src name from its parent directory and reduce INODE's link count by 1).
+    unlink(src_file);
     return 0;
 }
