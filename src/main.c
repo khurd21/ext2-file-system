@@ -195,8 +195,9 @@ int main(int argc, char *argv[ ])
     }
     else if (strcmp(cmd, "write") == 0)
     {
+        // TODO: How can I figure out a valid fd?
       char wbuf[BLKSIZE];
-      mywrite(atoi(pathname), atoi(pathname2), wbuf); // MEED A VAR TO RETURN TO
+      mywrite(atoi(pathname), sizeof(pathname2), pathname2); // MEED A VAR TO RETURN TO
     }
     else if (strcmp(cmd, "cat") == 0)
       cat(pathname);

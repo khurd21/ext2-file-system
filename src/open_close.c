@@ -130,6 +130,37 @@ int inode_truncate(MINODE *pmip)
     }
 
     // TODO: CHECK IF INDIRECT BLOCKS AND DOUBLY INDIRECT BLOCKS ARE USED
+    // Singly Indirect
+    if (ip->i_block[12] != 0)
+    {
+        get_block(dev, ip->i_block[12], buf);
+        dp = (DIR *)buf;
+        while (dp->rec_len != 0)
+        {
+            bdalloc(dev, dp->inode);
+            dp = (DIR *)((char *)dp + dp->rec_len);
+        }
+        bdalloc(dev, ip->i_block[12]);
+        ip->i_block[12] = 0;
+    }
+    // Doubly Indirect
+    if (ip->i_block[13] != 0)
+    {
+        get_block(dev, ip->i_block[13], buf);
+        dp = (DIR *)buf;
+        while (dp->rec_len != 0)
+        {
+            bdalloc(dev, dp->inode);
+            dp = (DIR *)((char *)dp + dp->rec_len);
+        }
+        bdalloc(dev, ip->i_block[13]);
+        ip->i_block[13] = 0;
+    }
+
+    pmip->INODE.i_blocks = 0;
+    pmip->INODE.i_size = 0;
+    pmip->dirty = 1;
+    iput(pmip);
 }
 
 /*
