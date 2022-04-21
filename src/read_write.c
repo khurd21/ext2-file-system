@@ -120,14 +120,15 @@ int mywrite(int fd, int nbytes, const void* buf)
     char *cq = buf;
     int blk = 0, count = 0, remain = 0;
     const int res = BLKSIZE / sizeof(int);
+    printf("mywrite: res = %d\n", res);
+    // 
     OFT *oftp = running->fd[fd];
     MINODE *mip = running->fd[fd]->minode_ptr;
     while (nbytes > 0)
     {
-        printf("A\n");
+        // logical block
         int lbk = oftp->offset / BLKSIZE;
         const int start_byte = oftp->offset % BLKSIZE;
-        printf("B\n");
 
         if (lbk < 12)
         {
@@ -153,7 +154,7 @@ int mywrite(int fd, int nbytes, const void* buf)
                     printf("mywrite: no more blocks\n");
                     return -1;
                 }
-                get_block(mip->dev, mip->INODE.i_block[12], write_buf);
+                // get_block(mip->dev, mip->INODE.i_block[12], write_buf);
                 for (int i = 0; i < res; ++i)
                 {
                     ((int*)write_buf)[i] = 0;
@@ -162,8 +163,8 @@ int mywrite(int fd, int nbytes, const void* buf)
                 mip->INODE.i_blocks++;
             }
             // get i_block[12] into an int ibuf[256]
-            char ibuf[BLKSIZE] = { 0 };
-            memset(ibuf, 0, BLKSIZE);
+            char ibuf[BLKSIZE] = { '\0' };
+            memset(ibuf, '\0', BLKSIZE);
             get_block(mip->dev, mip->INODE.i_block[12], ibuf);
             blk = ibuf[lbk - 12];
             if (blk == 0)
@@ -177,6 +178,7 @@ int mywrite(int fd, int nbytes, const void* buf)
         }
         else
         {
+            printf("mywrite: ENTERING ELSE BLOCK RES: %d\n", res);
             // Double Indirect Blocks
             lbk -= (12 + res);
             if (mip->INODE.i_block[13] == 0)
@@ -189,7 +191,7 @@ int mywrite(int fd, int nbytes, const void* buf)
                     printf("mywrite: no more blocks\n");
                     return -1;
                 }
-                get_block(mip->dev, mip->INODE.i_block[13], write_buf);
+                // get_block(mip->dev, mip->INODE.i_block[13], write_buf);
                 for (int i = 0; i < res; ++i)
                 {
                     ((int*)write_buf)[i] = 0;
@@ -198,11 +200,15 @@ int mywrite(int fd, int nbytes, const void* buf)
                 mip->INODE.i_blocks++;
             }
 
-            char indirect_blk[res];
+            // when declared with `res`, res gets set to zero in get_block. but it is a constant value
+            char indirect_blk[256];
             memset(indirect_blk, 0, res);
+            printf("RES AFTER MEMSET: %d\n", res);
             get_block(mip->dev, mip->INODE.i_block[13], indirect_blk);
-            // printf("lbk: %d\n", lbk);
-            // printf("res: %d\n", res);
+            // int res = 256;
+            printf("RES AFTER MEMSET: %d\n", res);
+            printf("lbk: %d\n", lbk);
+            printf("res: %d\n", res);
             // ERROR AROUND HERE
             int indirect_blk_num = indirect_blk[lbk / res];
             if (indirect_blk_num == 0)
@@ -215,16 +221,18 @@ int mywrite(int fd, int nbytes, const void* buf)
                     printf("mywrite: no more blocks\n");
                     return -1;
                 }
+                // get_block(mip->dev, indirect_blk_num, write_buf_double_indirect);
                 for (int i = 0; i < res; ++i)
                 {
                     ((int*)write_buf_double_indirect)[i] = 0;
                 }
+                put_block(mip->dev, indirect_blk_num, indirect_blk);
+                put_block(mip->dev, mip->INODE.i_block[13], write_buf_double_indirect);
                 mip->INODE.i_blocks++;
-                put_block(mip->dev, mip->INODE.i_block[13], indirect_blk);
-                put_block(mip->dev, indirect_blk_num, write_buf_double_indirect);
             }
+
             // get i_block[13] into an int indirect_blk[256]
-            memset(indirect_blk, 0, res);
+            memset(indirect_blk, '\0', res);
             get_block(mip->dev, indirect_blk_num, indirect_blk);
             if (indirect_blk[lbk % res] == 0)
             {
@@ -278,10 +286,10 @@ int mywrite(int fd, int nbytes, const void* buf)
             // update the count
             count += nbytes;
             // update the nbytes
-            nbytes -= nbytes;
             // update the buf
             cq += nbytes;
             cp += nbytes;
+            nbytes -= nbytes;
         }
         if(oftp->offset > mip->INODE.i_size)
         {
