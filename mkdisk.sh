@@ -3,6 +3,11 @@
 
 mkdir -p images
 cd ./images
+
+rm -f diskimage
+wget https://eecs.wsu.edu/~cs360/samples/LEVEL1/mountroot/mydisk
+mv mydisk diskimage
+
 sudo dd if=/dev/zero of=diskimage bs=1024 count=1440
 sudo mke2fs -b 1024 diskimage 1440
 

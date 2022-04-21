@@ -22,8 +22,9 @@ int cat(char *pathname)
         return -1;
     }
 
-    while ((n = myread(fd, BLKSIZE, mybuf)))
+    while ((n = myread(fd, BLKSIZE, mybuf)) > 0) // -1 is error.
     {
+        mybuf[n] = '\0'; // Icky infinite loop
         // must spit out chars from mybuf[ ] \n properly; ??
         char *cp = mybuf; // check char by char for NULL or \n
         while (*cp)
@@ -31,6 +32,7 @@ int cat(char *pathname)
             putchar(*cp++);
         }
     }
+    myclose(fd);
     return 0;
 }
 
@@ -48,12 +50,12 @@ NOTE:  In the project, you may have to creat the dst file first, then open it
     }
 */
 
-int cp(char *src_file, char *dest_file)
+int cp(const char *src_file, char *dest_file)
 {
     char buf[BLKSIZE];
-    int total_bytes = 0;
+    unsigned int total_bytes = 0;
     int fd = myopen(src_file, READ);
-    int gd = myopen(dest_file, READ_WRITE);
+    int gd = myopen(dest_file, WRITE);
     int n;
 
     if (fd < 0 || gd < 0)
@@ -62,10 +64,13 @@ int cp(char *src_file, char *dest_file)
         return -1;
     }
 
-    while (n = myread(fd, BLKSIZE, buf))
+    printf("cp: copying %s to %s\n", src_file, dest_file);
+    printf("cp: copying %d to %d\n", fd, gd);
+    while ((n = myread(fd, BLKSIZE, buf)) > 0)
     {
         mywrite(gd, n, buf);
         memset(buf, 0, BLKSIZE);
+        printf("TOTAL BYTES: %d\n", total_bytes);
         total_bytes += n;
     }
 

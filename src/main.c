@@ -191,12 +191,11 @@ int main(int argc, char *argv[ ])
     else if (strcmp(cmd, "read") == 0)
     {
       char rbuf[BLKSIZE];
-      myread(atoi(pathname), atoi(pathname2), rbuf); // NEED A VAR TO RETURN TO
+      myread(atoi(pathname), sizeof(pathname2), pathname2); // NEED A VAR TO RETURN TO
     }
     else if (strcmp(cmd, "write") == 0)
     {
-        // TODO: How can I figure out a valid fd?
-      char wbuf[BLKSIZE];
+      // char wbuf[BLKSIZE];
       mywrite(atoi(pathname), sizeof(pathname2), pathname2); // MEED A VAR TO RETURN TO
     }
     else if (strcmp(cmd, "cat") == 0)

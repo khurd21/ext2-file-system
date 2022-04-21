@@ -10,7 +10,7 @@
 #include "type.h"
 #include "util.h"
 
-int myread(int fd, int nbytes,  char* buf)
+int myread(int fd, int nbytes, void* buf)
 {
     // checks if the fd is valid
     if (fd < 0 || fd >= NFD || running->fd[fd] == NULL)
@@ -20,7 +20,7 @@ int myread(int fd, int nbytes,  char* buf)
     }
 
     // checks if the file is open for READ
-    if (running->fd[fd]->mode == READ || running->fd[fd] == READ_WRITE)
+    if ((running->fd[fd]->mode == READ || running->fd[fd] == READ_WRITE) == 0)
     {
         printf("myread: fd is not open for read\n");
         return -1;
@@ -41,7 +41,7 @@ int myread(int fd, int nbytes,  char* buf)
     while(nbytes && avil_bytes)
     {
         int lbk = oftp->offset / BLKSIZE;
-        int startByte = oftp->offset % BLKSIZE;
+        const int start_byte = oftp->offset % BLKSIZE;
 
         if (lbk < 12)
         {
@@ -70,11 +70,12 @@ int myread(int fd, int nbytes,  char* buf)
         }
 
         // get the data block into readbuf[BLKSIZE]
+        memset(read_buf, 0, BLKSIZE);
         get_block(oftp->minode_ptr->dev, blk, read_buf);
 
         // copy from startByte to buf[ ], at most remain bytes in this block
-        char *cp = read_buf + startByte;
-        remain = BLKSIZE - startByte;
+        char *cp = read_buf + start_byte;
+        remain = BLKSIZE - start_byte;
 
         // What is this trying to do?
         // if (nbytes < remain) remain = nbytes;
@@ -92,11 +93,11 @@ int myread(int fd, int nbytes,  char* buf)
         // if one data block is not enough, loop back to OUTER while for more ...
     }
 
-    printf("myread: read %d char from file descriptor %d\n", count, fd);
+    // printf("myread: read %d char from file descriptor %d\n", count, fd);
     return count;
 }
 
-int mywrite(int fd, int nbytes, char *buf)
+int mywrite(int fd, int nbytes, const void* buf)
 {
     // checks if the fd is valid
     if (fd < 0 || fd >= NFD || running->fd[fd] == NULL)
@@ -112,15 +113,21 @@ int mywrite(int fd, int nbytes, char *buf)
         return -1;
     }
 
-    char write_buf[BLKSIZE];
+    char write_buf[BLKSIZE] = { '\0' };
+    char write_buf_double_indirect[BLKSIZE] = { '\0' };
+    memset(write_buf, 0, BLKSIZE);
+    memset(write_buf_double_indirect, 0, BLKSIZE);
     char *cq = buf;
     int blk = 0, count = 0, remain = 0;
+    const int res = BLKSIZE / sizeof(int);
     OFT *oftp = running->fd[fd];
     MINODE *mip = running->fd[fd]->minode_ptr;
     while (nbytes > 0)
     {
+        printf("A\n");
         int lbk = oftp->offset / BLKSIZE;
-        const int startByte = oftp->offset % BLKSIZE;
+        const int start_byte = oftp->offset % BLKSIZE;
+        printf("B\n");
 
         if (lbk < 12)
         {
@@ -129,9 +136,11 @@ int mywrite(int fd, int nbytes, char *buf)
                 // allocate a new data block
                 mip->INODE.i_block[lbk] = balloc(mip->dev);
             }
-            int blk = mip->INODE.i_block[lbk];
+            // ref blk outside while loop
+            // blk was being set then destroyed exiting if statement
+            blk = mip->INODE.i_block[lbk];
         }
-        else if (lbk >= 12 && lbk < 256 + 12)
+        else if (lbk >= 12 && lbk < res + 12)
         {
             // Indirect Blocks
             if(mip->INODE.i_block[12] == 0)
@@ -145,8 +154,7 @@ int mywrite(int fd, int nbytes, char *buf)
                     return -1;
                 }
                 get_block(mip->dev, mip->INODE.i_block[12], write_buf);
-                const int res = BLKSIZE / sizeof(int);
-                for (int i = 0; i < res; i++)
+                for (int i = 0; i < res; ++i)
                 {
                     ((int*)write_buf)[i] = 0;
                 }
@@ -154,7 +162,8 @@ int mywrite(int fd, int nbytes, char *buf)
                 mip->INODE.i_blocks++;
             }
             // get i_block[12] into an int ibuf[256]
-            char ibuf[BLKSIZE];
+            char ibuf[BLKSIZE] = { 0 };
+            memset(ibuf, 0, BLKSIZE);
             get_block(mip->dev, mip->INODE.i_block[12], ibuf);
             blk = ibuf[lbk - 12];
             if (blk == 0)
@@ -165,12 +174,11 @@ int mywrite(int fd, int nbytes, char *buf)
                 mip->INODE.i_blocks++;
                 put_block(mip->dev, mip->INODE.i_block[12], ibuf);
             }
-            // ....... more to do after???
         }
         else
         {
             // Double Indirect Blocks
-            lbk -= (12 + (BLKSIZE / sizeof(int)));
+            lbk -= (12 + res);
             if (mip->INODE.i_block[13] == 0)
             {
                 // allocate a new block for it
@@ -182,8 +190,7 @@ int mywrite(int fd, int nbytes, char *buf)
                     return -1;
                 }
                 get_block(mip->dev, mip->INODE.i_block[13], write_buf);
-                const int res = BLKSIZE / sizeof(int);
-                for (int i = 0; i < res; i++)
+                for (int i = 0; i < res; ++i)
                 {
                     ((int*)write_buf)[i] = 0;
                 }
@@ -191,41 +198,55 @@ int mywrite(int fd, int nbytes, char *buf)
                 mip->INODE.i_blocks++;
             }
 
-            char indirect_blk[BLKSIZE / sizeof(int)];
+            char indirect_blk[res];
+            memset(indirect_blk, 0, res);
             get_block(mip->dev, mip->INODE.i_block[13], indirect_blk);
-            const int res = BLKSIZE / sizeof(int);
+            // printf("lbk: %d\n", lbk);
+            // printf("res: %d\n", res);
+            // ERROR AROUND HERE
             int indirect_blk_num = indirect_blk[lbk / res];
             if (indirect_blk_num == 0)
             {
                 // allocate a disk block
                 // record it in i_block[13]
                 indirect_blk_num = indirect_blk[lbk / res] = balloc(mip->dev);
-                for (int i = 0; i < res; i++)
+                if (indirect_blk_num == 0)
                 {
-                    ((int*)indirect_blk)[i] = 0;
+                    printf("mywrite: no more blocks\n");
+                    return -1;
+                }
+                for (int i = 0; i < res; ++i)
+                {
+                    ((int*)write_buf_double_indirect)[i] = 0;
                 }
                 mip->INODE.i_blocks++;
                 put_block(mip->dev, mip->INODE.i_block[13], indirect_blk);
-                put_block(mip->dev, indirect_blk_num, write_buf);
+                put_block(mip->dev, indirect_blk_num, write_buf_double_indirect);
             }
             // get i_block[13] into an int indirect_blk[256]
+            memset(indirect_blk, 0, res);
             get_block(mip->dev, indirect_blk_num, indirect_blk);
-            blk = indirect_blk[lbk % res];
-            if (blk == 0)
+            if (indirect_blk[lbk % res] == 0)
             {
                 // allocate a disk block
                 // record it in i_block[13]
                 blk = indirect_blk[lbk % res] = balloc(mip->dev);
+                if (blk == 0)
+                {
+                    printf("mywrite: no more blocks\n");
+                    return -1;
+                }
                 mip->INODE.i_blocks++;
                 put_block(mip->dev, indirect_blk_num, indirect_blk);
             }
         }
         // for all cases come here to write to the data block
 
+        memset(write_buf, 0, BLKSIZE);
         get_block(mip->dev, blk, write_buf);
         // copy from startByte to buf[ ], at most remain bytes in this block
-        char *cp = write_buf + startByte;
-        remain = BLKSIZE - startByte;
+        char *cp = write_buf + start_byte;
+        remain = BLKSIZE - start_byte;
 
         // Why this here?
         // We need to write the data to the block
@@ -235,7 +256,7 @@ int mywrite(int fd, int nbytes, char *buf)
             // copy from buf[ ] to write_buf[ ]
             memcpy(cp, cq, remain);
             // write the block back to disk
-            put_block(mip->dev, blk, write_buf);
+            // put_block(mip->dev, blk, write_buf);
             // update the offset
             oftp->offset += remain;
             // update the count
@@ -244,13 +265,14 @@ int mywrite(int fd, int nbytes, char *buf)
             nbytes -= remain;
             // update the buf
             cq += remain;
+            cp += remain;
         }
         else
         {
             // copy from buf[ ] to write_buf[ ]
             memcpy(cp, cq, nbytes);
             // write the block back to disk
-            put_block(mip->dev, blk, write_buf);
+            // put_block(mip->dev, blk, write_buf);
             // update the offset
             oftp->offset += nbytes;
             // update the count
@@ -259,13 +281,18 @@ int mywrite(int fd, int nbytes, char *buf)
             nbytes -= nbytes;
             // update the buf
             cq += nbytes;
+            cp += nbytes;
+        }
+        if(oftp->offset > mip->INODE.i_size)
+        {
+            mip->INODE.i_size = oftp->offset;
         }
         put_block(mip->dev, blk, write_buf);
         // loop back to outer while to write more ... until nbytes are written.
     }
 
     mip->dirty = 1;
-    printf("wrote %d char into file descriptor %d\n", nbytes, fd);
+    printf("wrote %d char into file descriptor %d\n", count, fd);
     return nbytes;
 }
 
