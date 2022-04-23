@@ -113,8 +113,8 @@ int mywrite(int fd, int nbytes, const void* buf)
         return -1;
     }
 
-    char write_buf[BLKSIZE] = { '\0' };
-    char write_buf_double_indirect[BLKSIZE] = { '\0' };
+    char write_buf[BLKSIZE];
+    char write_buf_double_indirect[BLKSIZE];
     memset(write_buf, 0, BLKSIZE);
     memset(write_buf_double_indirect, 0, BLKSIZE);
     char *cq = buf;
@@ -155,25 +155,28 @@ int mywrite(int fd, int nbytes, const void* buf)
                     return -1;
                 }
                 // get_block(mip->dev, mip->INODE.i_block[12], write_buf);
-                for (int i = 0; i < res; ++i)
-                {
-                    ((int*)write_buf)[i] = 0;
-                }
+                memset(write_buf, 0, BLKSIZE);
                 put_block(mip->dev, mip->INODE.i_block[12], write_buf);
                 mip->INODE.i_blocks++;
             }
             // get i_block[12] into an int ibuf[256]
-            char ibuf[BLKSIZE] = { '\0' };
-            memset(ibuf, '\0', BLKSIZE);
-            get_block(mip->dev, mip->INODE.i_block[12], ibuf);
+            int ibuf[256] = { '\0' };
+            memset(ibuf, 0, BLKSIZE);
+            get_block(mip->dev, mip->INODE.i_block[12], (char*)ibuf);
             blk = ibuf[lbk - 12];
             if (blk == 0)
             {
                 // allocate a disk block
                 // record it in i_block[12]
                 blk = ibuf[lbk - 12] = balloc(mip->dev);
+                // another check for no more blocks
+                if (blk == 0)
+                {
+                    printf("mywrite: no more blocks\n");
+                    return -1;
+                }
                 mip->INODE.i_blocks++;
-                put_block(mip->dev, mip->INODE.i_block[12], ibuf);
+                put_block(mip->dev, mip->INODE.i_block[12], (char*)ibuf);
             }
         }
         else
@@ -192,24 +195,19 @@ int mywrite(int fd, int nbytes, const void* buf)
                     return -1;
                 }
                 // get_block(mip->dev, mip->INODE.i_block[13], write_buf);
-                for (int i = 0; i < res; ++i)
-                {
-                    ((int*)write_buf)[i] = 0;
-                }
+                memset(write_buf, 0, BLKSIZE);
                 put_block(mip->dev, mip->INODE.i_block[13], write_buf);
                 mip->INODE.i_blocks++;
             }
 
             // when declared with `res`, res gets set to zero in get_block. but it is a constant value
-            char indirect_blk[256];
-            memset(indirect_blk, 0, res);
+            int indirect_blk[256];
+            memset(indirect_blk, 0, sizeof(indirect_blk));
             printf("RES AFTER MEMSET: %d\n", res);
-            get_block(mip->dev, mip->INODE.i_block[13], indirect_blk);
-            // int res = 256;
+            get_block(mip->dev, mip->INODE.i_block[13], (char*)indirect_blk);
             printf("RES AFTER MEMSET: %d\n", res);
             printf("lbk: %d\n", lbk);
             printf("res: %d\n", res);
-            // ERROR AROUND HERE
             int indirect_blk_num = indirect_blk[lbk / res];
             if (indirect_blk_num == 0)
             {
@@ -222,18 +220,15 @@ int mywrite(int fd, int nbytes, const void* buf)
                     return -1;
                 }
                 // get_block(mip->dev, indirect_blk_num, write_buf_double_indirect);
-                for (int i = 0; i < res; ++i)
-                {
-                    ((int*)write_buf_double_indirect)[i] = 0;
-                }
-                put_block(mip->dev, indirect_blk_num, indirect_blk);
-                put_block(mip->dev, mip->INODE.i_block[13], write_buf_double_indirect);
+                memset(write_buf_double_indirect, 0, BLKSIZE);
+                put_block(mip->dev, indirect_blk_num, write_buf_double_indirect);
+                put_block(mip->dev, mip->INODE.i_block[13], (char*)indirect_blk);
                 mip->INODE.i_blocks++;
             }
 
             // get i_block[13] into an int indirect_blk[256]
-            memset(indirect_blk, '\0', res);
-            get_block(mip->dev, indirect_blk_num, indirect_blk);
+            memset(indirect_blk, 0, sizeof(indirect_blk));
+            get_block(mip->dev, indirect_blk_num, (char*)indirect_blk);
             if (indirect_blk[lbk % res] == 0)
             {
                 // allocate a disk block
@@ -245,7 +240,7 @@ int mywrite(int fd, int nbytes, const void* buf)
                     return -1;
                 }
                 mip->INODE.i_blocks++;
-                put_block(mip->dev, indirect_blk_num, indirect_blk);
+                put_block(mip->dev, indirect_blk_num, (char*)indirect_blk);
             }
         }
         // for all cases come here to write to the data block
