@@ -229,7 +229,8 @@ int getino(char *pathname)
   {
       return 2;
   }
-  
+
+  // TODO: ask if dev could be checked here
   // starting mip = root OR CWD
   if (pathname[0]=='/')
   {
@@ -263,6 +264,9 @@ int getino(char *pathname)
       iput(mip);
       mip = iget(dev, ino);
    }
+
+   // TODO: add code here to account for upward and downward traversal
+
    iput(mip);
    return ino;
 }

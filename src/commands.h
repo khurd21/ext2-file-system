@@ -65,4 +65,8 @@ int cat(char *pathname);
 int cp(const char *src_file, char *dest_file);
 int mv(char *src_file, char *dest_file);
 
+/**** mount_unmount.c ****/
+int mount(char *filesys, char *mount_point);
+int unmount(char *filesys);
+
 #endif

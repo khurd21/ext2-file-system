@@ -30,10 +30,12 @@ DIR   *dp;
 #define READ_WRITE  2
 #define APPEND      3
 
+#define MAGIC  0xEF53
+
 typedef struct minode{
   INODE INODE;           // INODE structure on disk
   int dev, ino;          // (dev, ino) of INODE
-  int ref_count;          // in use count
+  int ref_count;         // in use count check
   int dirty;             // 0 for clean, 1 for modified
   int mounted;           // for level-3 mounted flag
   struct mntable *mptr;  // for level-3 mount table pointer

@@ -105,7 +105,7 @@ int menu() // can get rid of this if you want
 {
   printf("All Commands:\n");
   printf("[ls|cd|pwd|mkdir|rmdir|creat|link|unlink|symlink|readlink|stat|chmod|utime\n");
-  printf(" open|close|lseek|pfd|quit]\n");
+  printf(" open|close|lseek|pfd|mount|unmount|quit]\n");
 }
 
 int quit()
@@ -206,6 +206,10 @@ int main(int argc, char *argv[ ])
       mv(pathname, pathname2);
     else if (strcmp(cmd, "pfd") == 0)
       pfd();
+    else if (strcmp(cmd, "mount") == 0)
+      mount(pathname, pathname2);
+    else if (strcmp(cmd, "unmount") == 0)
+      unmount(pathname);
     else if (strcmp(cmd, "menu") == 0)
       menu();
   }
