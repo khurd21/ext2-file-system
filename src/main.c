@@ -105,7 +105,7 @@ int menu() // can get rid of this if you want
 {
   printf("All Commands:\n");
   printf("[ls|cd|pwd|mkdir|rmdir|creat|link|unlink|symlink|readlink|stat|chmod|utime\n");
-  printf(" open|close|lseek|pfd|mount|unmount|quit]\n");
+  printf(" open|close|lseek|pfd|mount|unmount|switch|quit]\n");
 }
 
 int quit()

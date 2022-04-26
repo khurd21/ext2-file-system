@@ -57,6 +57,20 @@ int mount(char *filesys, char *mount_point)
          return 0;
       }
    }
+
+   // check if there is a dev spot in the mtable which is free
+   for (int i = 0; i < NMTABLE; i++)
+   {
+      if(mtable[i].dev == 0)
+      {
+         break;
+      }
+      else if (i == (NMTABLE - 1))
+      {
+         printf("mount: No more free MOUNT table entries\n");
+         return -1;
+      }
+   }
    
    // 3. Open the filesys virtual disk (Under Linux) for RW; use (Linux) file
    // descriptor as new dev. Read filesys superblock to vertify it is an
@@ -118,12 +132,6 @@ int mount(char *filesys, char *mount_point)
          mip->mounted = 1;
          break;
       }
-
-      if (i == (NMTABLE - 1)) // might need to move this above step 3
-      {
-         printf("mount: no free space in mount table\n");
-         return -1;
-      }
    }
 
    return 0;
@@ -142,8 +150,6 @@ int unmount(char *filesys)
    // 1 - Search the MOUNT table to check filesys is indeed mounted. 
    for(int i = 0; i < NMTABLE; i++)
    {
-      printf("%s\n", mtable[i].dev_name);
-      printf("%s\n", filesys);
       // checks if the filesys is mounted and dev is not 0 (not free)
       if(strcmp(mtable[i].dev_name, filesys) == 0 && mtable[i].dev != 0)
       {
