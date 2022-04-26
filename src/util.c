@@ -141,9 +141,8 @@ int iput(MINODE *mip)
  }
  
  /* write INODE back to disk */
-
    printf("imap: %d\n", imap);
-  block = ((mip->ino - 1) / 8) + iblk;
+  block = ((mip->ino - 1) / 8) + iblk; 
   offset = (mip->ino - 1) % 8;
 
   // first get the block containing this inode
@@ -221,55 +220,87 @@ int search(MINODE *mip, char *name)
 
 int getino(char *pathname)
 {
-  int i, ino;
-  MINODE *mip;
+   int i, ino;
+   MINODE *mip;
 
-  printf("getino: pathname=%s\n", pathname);
-  if (strcmp(pathname, "/")==0)
-  {
+   printf("getino: pathname=%s\n", pathname);
+   if (strcmp(pathname, "/")==0)
+   {
       return 2;
-  }
+   }
+    int o_dev = dev;
+   // TODO: ask if dev could be checked here
+   // starting mip = root OR CWD
+   if (pathname[0]=='/')
+   {
+      dev = root->dev;
+      mip = root;
+   }
+   else
+   {
+      dev = running->cwd->dev;
+      mip = running->cwd;
+   }
 
-  // TODO: ask if dev could be checked here
-  // starting mip = root OR CWD
-  if (pathname[0]=='/')
-  {
-     mip = root;
-  }
-  else
-  {
-     mip = running->cwd;
-  }
 
-  mip->ref_count++;         // because we iput(mip) later
-  
-  tokenize(pathname);
-  for (i=0; i<nname; i++) {
-     if (S_ISDIR(mip->INODE.i_mode == 0))
-     {
-        printf("%s is not a directory.\n", name[i]);
-        iput(mip);
-        return 0;
-     }
+   mip->ref_count++;         // because we iput(mip) later
+   
+   tokenize(pathname);
+
+   for (i=0; i<nname; i++) 
+   {
+      if (S_ISDIR(mip->INODE.i_mode == 0))
+      {
+         printf("%s is not a directory.\n", name[i]);
+         iput(mip);
+         return 0;
+      }
 
       printf("===========================================\n");
       printf("getino: i=%d name[%d]=%s\n", i, i, name[i]);
- 
+
       ino = search(mip, name[i]);
       if (ino==0){
          printf("name %s does not exist\n", name[i]);
          iput(mip);
          return -1;
       }
+      else if (ino == 2 && running->cwd->dev != o_dev) // upward transversal
+      {
+         for (int i = 0; i < NMTABLE;i++)
+         {
+            if (mip->dev == mtable[i].dev)
+            {
+               mip = mtable[i].mnt_dir_ptr;           
+               dev = mip->dev;
+               break;
+            }
+         }
+      }
+      else // downward transversal
+      {
+         // check is mip is mounted
+         // follow mtable's mnt_dir_ptr to get the root of the mounted device
+         // iget the ino of the root of the mounted device
+         mip->dirty = 1; // mark dirty
+         iput(mip);      // write back to disk
+         mip = iget(dev, ino); // get the inode of the root of the mounted device
+         if(mip->mounted)
+         {
+            MTABLE *mnt_ptr = mip->mptr;
+            dev = mnt_ptr->dev;
+            ino = 2;
+            mip = iget(dev, ino); // inode under root of mounted device
+         }
+      }
+      mip->dirty = 1;
       iput(mip);
       mip = iget(dev, ino);
    }
-
-   // TODO: add code here to account for upward and downward traversal
-
+    
    iput(mip);
    return ino;
-}
+} 
 
 // These 2 functions are needed for pwd()
 // TODO:

@@ -92,8 +92,8 @@ int mount(char *filesys, char *mount_point)
       return -1;
    }
 
-   // check that the mount_point is not busy (and files always has a refcount starting at 1)
-   if(mip->ref_count > 1)
+   // check that the mount_point is not busy (and folders start at 2 because of . and ..)
+   if(mip->ref_count > 2)
    {
       printf("mount: %s is busy\n", mount_point);
       return -1;
@@ -170,3 +170,68 @@ int unmount(char *filesys)
    printf("unmount: %s is not mounted\n", filesys);
    return -1;
 }
+/*
+Algorithm for access
+1 - int r;
+2 - if (SUPERuser: running->uid == 0)
+      return 1;
+3 - // NOT SUPERuser: get file's INODE
+    ino = getino(filename);
+    mip = iget(dev, ino);
+4 - if (OWNER: mip->INODE.i_uid == running->uid)
+      r = (check owner's rwx with mode); // by tst_bit()
+    else
+      r = (check other's rwx with mode); // by tst_bit()
+5 - iput(mip);
+6 - return r;
+
+returns 1 if the user has the mode's permission to the file, 0 otherwise
+*/
+int access(char *filename, char mode) // mode = r|w|x:
+{
+   // 1 - int r;
+   int r = 0;
+
+   // 2 - if (SUPERuser: running->uid == 0)
+   if(running->uid == 0)
+      return 1;
+
+   // 3 - // NOT SUPERuser: get file's INODE
+   int ino = getino(filename);
+   MINODE *mip = iget(dev, ino);
+   // 4 - if (OWNER: mip->INODE.i_uid == running->uid)
+   if(mip->INODE.i_uid == running->uid)
+   {
+      // 4.1 - r = (check owner's rwx with mode); // by tst_bit()
+   }
+   else
+   {
+      // 4.2 - r = (check other's rwx with mode); // by tst_bit()
+   }
+
+   // 5 - iput(mip);
+   iput(mip);
+   
+   return r;
+}
+
+int switch_user()
+{
+   if(running->uid == 0)
+      running->uid = 1;
+   else
+      running->uid = 0;
+   return 0;
+}
+
+/*
+cd_ls_pwd:   must have x and r permissions
+mkdir_creat: must have rwx permissions to perent dir
+rmdir_unlink: must be the owner
+link old_file new_file: must have rwx on old_file, and rwx to the parent dir of new_file
+open file mode: must have the mode permission to the file
+
+Then Switch process to run P1 whose uid = 1, so it's not a superuser process.
+and test to see if it can access the file.
+
+*/

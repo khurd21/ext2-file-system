@@ -189,15 +189,9 @@ int main(int argc, char *argv[ ])
     else if (strcmp(cmd, "dup2") == 0)
       dup2(atoi(pathname), atoi(pathname2));
     else if (strcmp(cmd, "read") == 0)
-    {
-      char rbuf[BLKSIZE];
       myread(atoi(pathname), sizeof(pathname2), pathname2); // NEED A VAR TO RETURN TO
-    }
     else if (strcmp(cmd, "write") == 0)
-    {
-      // char wbuf[BLKSIZE];
       mywrite(atoi(pathname), sizeof(pathname2), pathname2); // MEED A VAR TO RETURN TO
-    }
     else if (strcmp(cmd, "cat") == 0)
       cat(pathname);
     else if (strcmp(cmd, "cp") == 0)
@@ -210,6 +204,8 @@ int main(int argc, char *argv[ ])
       mount(pathname, pathname2);
     else if (strcmp(cmd, "unmount") == 0)
       unmount(pathname);
+    else if (strcmp(cmd, "switch") == 0)
+      switch_user();
     else if (strcmp(cmd, "menu") == 0)
       menu();
   }

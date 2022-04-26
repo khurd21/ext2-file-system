@@ -68,5 +68,7 @@ int mv(char *src_file, char *dest_file);
 /**** mount_unmount.c ****/
 int mount(char *filesys, char *mount_point);
 int unmount(char *filesys);
+int access(char *filename, char mode);
+int switch_user();
 
 #endif
