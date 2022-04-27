@@ -202,7 +202,7 @@ int main(int argc, char *argv[ ])
       pfd();
     else if (strcmp(cmd, "mount") == 0)
       mount(pathname, pathname2);
-    else if (strcmp(cmd, "unmount") == 0)
+    else if (strcmp(cmd, "umount") == 0)
       unmount(pathname);
     else if (strcmp(cmd, "switch") == 0)
       switch_user();
