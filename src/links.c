@@ -18,6 +18,11 @@ int link(char *pathname, char* pathname2) // or ln
     printf("old_file: %s and new_file: %s\n", old_file, new_file);
     // 1 - verify old_file exists and is not a DIR
     int oino = getino(old_file);
+    if (oino == -1)
+    {
+        printf("link: %s does not exist\n", old_file);
+        return -1;
+    }
     MINODE *omip = iget(dev, oino);
     if (S_ISDIR(omip->INODE.i_mode))
     {
@@ -125,6 +130,7 @@ int unlink(char *pathname)
     }
     MINODE *pmip = iget(dev, pino);
     rm_child(pmip, child);
+    iput(pmip);
     return 0;
 }
 
