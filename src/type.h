@@ -10,10 +10,10 @@ typedef struct ext2_group_desc  GD;
 typedef struct ext2_inode       INODE;
 typedef struct ext2_dir_entry_2 DIR;
 
-SUPER *sp;
-GD    *gp;
-INODE *ip;
-DIR   *dp;   
+extern SUPER *sp;
+extern GD    *gp;
+extern INODE *ip;
+extern DIR   *dp;   
 
 #define FREE        0
 #define READY       1
