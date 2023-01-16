@@ -5,6 +5,9 @@
 - [How to Set Up](#how-to-set-up)
 - [Commands Implemented](#commands-implemented)
     - [Level 1](#level-1)
+    - [Level 2](#level-2)
+    - [Level 3](#level-3)
+
 
 # Description
 
