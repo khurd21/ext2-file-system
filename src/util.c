@@ -13,27 +13,36 @@
 
 MINODE *root;
 MINODE minode[NMINODE];
+MTABLE mtable[NMTABLE];
+OFT    oft[NOFT];
 PROC   proc[NPROC], *running;
 
-char gpath[128]; // global for tokenized components
-char *name[64];  // assume at most 64 components in pathname
-int  n;         // number of component strings
-
-int nblocks, ninodes, bmap, imap, iblk, inode_start;
-char line[128], cmd[32], pathname[128];
-int fd, dev;
+int  nname;         // number of component strings
+int nblocks, ninodes, bmap, imap, iblk;
+char gline[25], *name[16];
+int dev;
 
 int get_block(int dev, int blk, char *buf)
 {
-   lseek(dev, (long)blk*BLKSIZE, 0);
-   read(dev, buf, BLKSIZE);
+   lseek(dev, (long)blk*BLKSIZE, SEEK_SET);
+   int n = read(dev, buf, BLKSIZE);
+   if (n < 0)
+   {
+      printf("get_block: read error\n");
+      return -1;
+   }
    return 0;
 }   
 
 int put_block(int dev, int blk, char *buf)
 {
-   lseek(dev, (long)blk*BLKSIZE, 0);
-   write(dev, buf, BLKSIZE);
+   lseek(dev, (long)blk*BLKSIZE, SEEK_SET);
+   int n = write(dev, buf, BLKSIZE);
+   if (n != BLKSIZE)
+   {
+      printf("put_block: write error\n");
+      return -1;
+   }
    return 0;
 }   
 
@@ -43,33 +52,53 @@ int tokenize(char *pathname)
   char *s;
   printf("tokenize %s\n", pathname);
 
-  strcpy(gpath, pathname);   // tokens are in global gpath[ ]
-  n = 0;
+  strcpy(gline, pathname);   // tokens are in global gpath[ ]
+  nname = 0;
 
-  s = strtok(gpath, "/");
+  s = strtok(gline, "/");
   while(s){
-    name[n] = s;
-    n++;
+    name[nname] = s;
+    nname++;
     s = strtok(0, "/");
   }
-  name[n] = 0;
-  
-  for (i= 0; i<n; i++)
+    printf("Tokenized pathname: \n");
+  for (i= 0; i<nname; i++)
     printf("%s  ", name[i]);
   printf("\n");
+  return 0;
+}
+
+MINODE* mialloc()
+{
+  for (int i=0; i<NMINODE; i++)
+  {
+     MINODE* mp = &minode[i];
+    if (mp->ref_count == 0)
+    {
+      mp->ref_count = 1;
+      return mp;
+    }
+  }
+  printf("mialloc: no more free minodes\n");
+  return 0;
+}
+
+int midealloc(MINODE *mip)
+{
+  mip->ref_count = 0;
   return 0;
 }
 
 // return minode pointer to loaded INODE
 MINODE *iget(int dev, int ino)
 {
-  int i;
   MINODE *mip;
+  MTABLE *mp;
   char buf[BLKSIZE];
   int blk, offset;
   INODE *ip;
 
-  for (i=0; i<NMINODE; i++){
+  for (int i=0; i<NMINODE; i++){
     mip = &minode[i];
     if (mip->ref_count && mip->dev == dev && mip->ino == ino){
        mip->ref_count++;
@@ -77,30 +106,18 @@ MINODE *iget(int dev, int ino)
        return mip;
     }
   }
-    
-  for (i=0; i<NMINODE; i++){
-    mip = &minode[i];
-    if (mip->ref_count == 0){
-       //printf("allocating NEW minode[%d] for [%d %d]\n", i, dev, ino);
-       mip->ref_count = 1;
-       mip->dev = dev;
-       mip->ino = ino;
-
-       // get INODE of ino to buf    
-       blk    = (ino-1)/8 + iblk;
-       offset = (ino-1) % 8;
-
-       //printf("iget: ino=%d blk=%d offset=%d\n", ino, blk, offset);
-
-       get_block(dev, blk, buf);
-       ip = (INODE *)buf + offset;
-       // copy INODE to mp->INODE
-       mip->INODE = *ip; // memcopy
-       return mip;
-    }
-  }   
-  printf("PANIC: no more free minodes\n");
-  return NULL;
+   mip = mialloc();    
+   mip->dev = dev;
+   mip->ino = ino;
+   blk = (ino - 1) / 8 + iblk;
+   offset = (ino - 1) % 8;
+   get_block(dev, blk, buf);
+   ip = (INODE *)buf + offset;
+   mip->INODE = *ip;
+   mip->dirty = 0;
+   mip->mounted = 0;
+   mip->ref_count = 1;
+   return mip;
 }
 
 int iput(MINODE *mip)
@@ -118,13 +135,14 @@ int iput(MINODE *mip)
  {
     return -1;
  }
- if (!mip->dirty)
+ if (mip->dirty == 0)
  {
    return -1;
  }
  
  /* write INODE back to disk */
-  block = ((mip->ino - 1) / 8) + inode_start;
+   printf("imap: %d\n", imap);
+  block = ((mip->ino - 1) / 8) + iblk; 
   offset = (mip->ino - 1) % 8;
 
   // first get the block containing this inode
@@ -134,6 +152,7 @@ int iput(MINODE *mip)
   *ip = mip->INODE;
 
   put_block(mip->dev, block, buf);
+  midealloc(mip);
  /**************** NOTE ******************************
   For mountroot, we never MODIFY any loaded INODE
                  so no need to write it back
@@ -172,14 +191,20 @@ int search(MINODE *mip, char *name)
 
    for (int i = 0; i < ip->i_blocks; ++i)
    {
-      get_block(dev, ip->i_block[i], sbuf);
+      if (ip->i_block[i] == 0)
+      {
+         break;
+      }
+
+      get_block(mip->dev, ip->i_block[i], sbuf);
       dp = (DIR *)sbuf;
       cp = sbuf;
       printf("  ino   rlen  nlen  name\n");
-
-      while (cp < sbuf + BLKSIZE && dp->inode != 0){
+      // We had a second condition in while loop: && dp->inode != 0
+      while (cp < sbuf + BLKSIZE)
+      {
          strncpy(temp, dp->name, dp->name_len);
-         temp[dp->name_len] = 0;
+         temp[dp->name_len] = '\0';
          printf("%4d  %4d  %4d    %s\n", 
            dp->inode, dp->rec_len, dp->name_len, dp->name);
          if (strcmp(temp, name)==0){
@@ -195,41 +220,87 @@ int search(MINODE *mip, char *name)
 
 int getino(char *pathname)
 {
-  int i, ino, blk, offset;
-  char buf[BLKSIZE];
-  INODE *ip;
-  MINODE *mip;
+   int i, ino;
+   MINODE *mip;
 
-  printf("getino: pathname=%s\n", pathname);
-  if (strcmp(pathname, "/")==0)
+   printf("getino: pathname=%s\n", pathname);
+   if (strcmp(pathname, "/")==0)
+   {
       return 2;
-  
-  // starting mip = root OR CWD
-  if (pathname[0]=='/')
-     mip = root;
-  else
-     mip = running->cwd;
+   }
+    int o_dev = dev;
+   // TODO: ask if dev could be checked here
+   // starting mip = root OR CWD
+   if (pathname[0]=='/')
+   {
+      dev = root->dev;
+      mip = root;
+   }
+   else
+   {
+      dev = running->cwd->dev;
+      mip = running->cwd;
+   }
 
-  mip->ref_count++;         // because we iput(mip) later
-  
-  tokenize(pathname);
-  for (i=0; i<n; i++){
+
+   mip->ref_count++;         // because we iput(mip) later
+   
+   tokenize(pathname);
+
+   for (i=0; i<nname; i++) 
+   {
+      if (S_ISDIR(mip->INODE.i_mode == 0))
+      {
+         printf("%s is not a directory.\n", name[i]);
+         iput(mip);
+         return 0;
+      }
+
       printf("===========================================\n");
       printf("getino: i=%d name[%d]=%s\n", i, i, name[i]);
- 
-      ino = search(mip, name[i]);
 
+      ino = search(mip, name[i]);
       if (ino==0){
-         iput(mip);
          printf("name %s does not exist\n", name[i]);
+         iput(mip);
          return -1;
       }
+      else if (ino == 2 && running->cwd->dev != o_dev) // upward transversal
+      {
+         for (int i = 0; i < NMTABLE;i++)
+         {
+            if (mip->dev == mtable[i].dev)
+            {
+               mip = mtable[i].mnt_dir_ptr;           
+               dev = mip->dev;
+               break;
+            }
+         }
+      }
+      else // downward transversal
+      {
+         // check is mip is mounted
+         // follow mtable's mnt_dir_ptr to get the root of the mounted device
+         // iget the ino of the root of the mounted device
+         mip->dirty = 1; // mark dirty
+         iput(mip);      // write back to disk
+         mip = iget(dev, ino); // get the inode of the root of the mounted device
+         if(mip->mounted)
+         {
+            MTABLE *mnt_ptr = mip->mptr;
+            dev = mnt_ptr->dev;
+            ino = 2;
+            mip = iget(dev, ino); // inode under root of mounted device
+         }
+      }
+      mip->dirty = 1;
       iput(mip);
       mip = iget(dev, ino);
    }
+    
    iput(mip);
    return ino;
-}
+} 
 
 // These 2 functions are needed for pwd()
 // TODO:
