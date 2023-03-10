@@ -1,15 +1,16 @@
 # Ext2 File System
 
-# Table of Contents
-- [Description](#description)
-- [How to Set Up](#how-to-set-up)
-- [Commands Implemented](#commands-implemented)
-    - [Level 1](#level-1)
-    - [Level 2](#level-2)
-    - [Level 3](#level-3)
+<img
+    src="https://img.shields.io/badge/Programming Language-A8B9CC?style=for-the-badge&logo=C&logoColor=black"
+    alt="Website Badge" />
+<img
+    src="https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=Linux&logoColor=black"
+    alt="Website Badge" />
+<img
+    src="https://img.shields.io/badge/Amazon EC2-FF9900?style=for-the-badge&logo=AmazonEC2&logoColor=black"
+    alt="Website Badge" />
 
-
-# Description
+![EXT2 File System Header](./resources/imgs/ext2-file-system-header.png)
 
 This project is intended to be a totally Linux-compatible ext2 file system.
 The project deliverables were comprised of three primary sections. The first level
@@ -19,6 +20,19 @@ implements mount and unmount as well as focusing on security features of the
 file system. The third level is partially complete and currently cannot unmount
 a mounted image.
 
+# Tools Used in this Project
+
+- C programming language
+- Amazon EC2
+- GCC-11
+- Linux distribution on x86 architecture
+- ext2 file system library
+
+# Development Environment
+
+- Amazon EC2
+- Terminal
+- Vim
 
 # How to Set Up
 
